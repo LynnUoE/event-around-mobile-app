@@ -7,10 +7,12 @@ import com.csci571.hw4.eventsaround.data.remote.RetrofitClient
 import com.csci571.hw4.eventsaround.data.model.SearchParams
 import com.csci571.hw4.eventsaround.data.model.EventDetails
 import com.csci571.hw4.eventsaround.data.model.Event
+import android.util.Log
 
 class EventRepository {
 
     private val apiService = RetrofitClient.getApiService()
+    private val TAG = "EventRepository"
 
     suspend fun searchEvents(params: SearchParams): Result<List<Event>> {
         return withContext(Dispatchers.IO) {
@@ -21,17 +23,21 @@ class EventRepository {
                     )
                 }
 
+                Log.d(TAG, "Searching with params: ${params.toQueryMap()}")
+
                 val response = apiService.searchEvents(params.toQueryMap())
 
                 if (response.isSuccessful) {
-                    val events = response.body()?.events ?: emptyList()
+                    val events = response.body()?.embedded?.events ?: emptyList()
+                    Log.d(TAG, "Search successful: Found ${events.size} events")
                     Result.success(events)
                 } else {
-                    Result.failure(
-                        Exception("API Error: ${response.code()} ${response.message()}")
-                    )
+                    val error = "API Error: ${response.code()} ${response.message()}"
+                    Log.e(TAG, error)
+                    Result.failure(Exception(error))
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Search error", e)
                 Result.failure(e)
             }
         }
@@ -52,6 +58,7 @@ class EventRepository {
                     )
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Event details error", e)
                 Result.failure(e)
             }
         }
@@ -73,6 +80,7 @@ class EventRepository {
                     Result.success(emptyList())
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Autocomplete error", e)
                 Result.success(emptyList())
             }
         }

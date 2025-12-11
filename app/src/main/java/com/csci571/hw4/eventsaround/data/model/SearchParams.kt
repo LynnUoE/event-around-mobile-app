@@ -19,10 +19,15 @@ data class SearchParams(
         const val CATEGORY_ARTS = "Arts & Theatre"
         const val CATEGORY_FILM = "Film"
         const val CATEGORY_MISCELLANEOUS = "Miscellaneous"
+
+        // Default Los Angeles coordinates
+        const val DEFAULT_LAT = 34.0522
+        const val DEFAULT_LNG = -118.2437
     }
 
     fun toQueryMap(): Map<String, String> {
         val map = mutableMapOf<String, String>()
+
         map["keyword"] = keyword
         map["distance"] = distance.toString()
 
@@ -30,21 +35,18 @@ data class SearchParams(
             map["category"] = category
         }
 
-        if (autoDetect && latitude != null && longitude != null) {
-            map["lat"] = latitude.toString()
-            map["lng"] = longitude.toString()
-        } else if (location.isNotEmpty()) {
-            map["location"] = location
-        }
+        // Always need coordinates for this API
+        val lat = latitude ?: DEFAULT_LAT
+        val lng = longitude ?: DEFAULT_LNG
+
+        map["lat"] = lat.toString()
+        map["lng"] = lng.toString()
 
         return map
     }
 
     fun isValid(): Boolean {
-        if (keyword.isBlank()) return false
-        if (autoDetect && (latitude == null || longitude == null)) return false
-        if (!autoDetect && location.isBlank()) return false
-        return true
+        return keyword.isNotBlank()
     }
 }
 

@@ -16,6 +16,7 @@ class MainActivity : ComponentActivity() {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        SimpleDataLayerTest.runQuickTests(this)
 
         setContent {
             EventsAroundTheme {

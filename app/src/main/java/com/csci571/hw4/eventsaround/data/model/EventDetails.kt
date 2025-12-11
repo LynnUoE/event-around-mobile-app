@@ -34,10 +34,7 @@ data class EventDetails(
     val buyTicketUrl: String? = null,
 
     @SerializedName("seatmap")
-    val seatMapUrl: String? = null,
-
-    @SerializedName("attractions")
-    val attractions: List<Attraction>? = null
+    val seatMapUrl: String? = null
 )
 
 data class VenueInfo(
@@ -72,26 +69,6 @@ data class Location(
 
     @SerializedName("longitude")
     val longitude: Double
-)
-
-data class Attraction(
-    @SerializedName("name")
-    val name: String,
-
-    @SerializedName("url")
-    val url: String? = null,
-
-    @SerializedName("image")
-    val imageUrl: String? = null,
-
-    @SerializedName("followers")
-    val followers: Long? = null,
-
-    @SerializedName("popularity")
-    val popularity: Int? = null,
-
-    @SerializedName("albums")
-    val albums: List<Album>? = null
 )
 
 data class Album(

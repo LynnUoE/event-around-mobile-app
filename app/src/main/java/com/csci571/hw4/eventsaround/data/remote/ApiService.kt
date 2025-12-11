@@ -12,7 +12,7 @@ import com.csci571.hw4.eventsaround.data.model.EventListResponse
 
 interface ApiService {
 
-    @GET("api/search")
+    @GET("api/events/search")
     suspend fun searchEvents(
         @QueryMap params: Map<String, String>
     ): Response<EventListResponse>
@@ -26,9 +26,4 @@ interface ApiService {
     suspend fun getAutocompleteSuggestions(
         @Query("keyword") keyword: String
     ): Response<AutocompleteResponse>
-
-    @GET("api/venue")
-    suspend fun getVenueDetails(
-        @Query("name") venueName: String
-    ): Response<Map<String, Any>>
 }
