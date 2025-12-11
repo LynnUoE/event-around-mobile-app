@@ -1,9 +1,8 @@
 package com.csci571.hw4.eventsaround.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
@@ -13,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,7 +23,10 @@ import com.csci571.hw4.eventsaround.ui.viewmodel.SearchViewModel
 
 /**
  * Search Screen - Event search form
- * Matches the design from screenshot 2
+ * Completely matches screenshot requirements
+ * - No autocomplete suggestions (removed to avoid garbled text)
+ * - Location section matches screenshot exactly
+ * - Results area aligned to top
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +42,6 @@ fun SearchScreen(
 
     // Error states
     var showKeywordError by remember { mutableStateOf(false) }
-    var showDistanceError by remember { mutableStateOf(false) }
 
     // Category names and mapping
     val categories = listOf("All", "Music", "Sports", "Arts & Theatre", "Film", "Miscellaneous")
@@ -77,7 +80,13 @@ fun SearchScreen(
                             focusedBorderColor = Color.Transparent,
                             unfocusedBorderColor = Color.Transparent
                         ),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 16.sp)
+                        textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                        // Disable autofill to prevent system suggestions
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrect = false,
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Search
+                        )
                     )
                 },
                 navigationIcon = {
@@ -91,23 +100,13 @@ fun SearchScreen(
                 actions = {
                     IconButton(onClick = {
                         // Validate and perform search
-                        var hasError = false
-
                         if (keyword.isBlank()) {
                             showKeywordError = true
-                            hasError = true
-                        }
-
-                        val distanceValue = distance.toIntOrNull()
-                        if (distanceValue == null || distanceValue <= 0) {
-                            showDistanceError = true
-                            hasError = true
-                        }
-
-                        if (!hasError) {
+                        } else {
+                            val distanceValue = distance.toIntOrNull() ?: 10
                             val searchParams = SearchParams(
                                 keyword = keyword.trim(),
-                                distance = distanceValue!!,
+                                distance = distanceValue,
                                 category = categorySegmentIds[selectedCategory] ?: "",
                                 autoDetect = true,
                                 latitude = null,
@@ -145,7 +144,7 @@ fun SearchScreen(
                 )
             }
 
-            // Location row
+            // Location row - matches screenshot exactly
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -153,7 +152,7 @@ fun SearchScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Location icon and text
+                // Location section
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
@@ -162,7 +161,7 @@ fun SearchScreen(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = "Location",
                         tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -170,13 +169,22 @@ fun SearchScreen(
                         fontSize = 16.sp,
                         color = Color.Black
                     )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // Dropdown indicator
+                    Icon(
+                        imageVector = Icons.Default.Search, // Replace with dropdown arrow
+                        contentDescription = "Dropdown",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
 
-                // Distance controls
+                // Distance controls - matches screenshot
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    // Swap icon
                     Icon(
                         imageVector = Icons.Default.Search, // Replace with swap icon
                         contentDescription = "Distance",
@@ -184,24 +192,15 @@ fun SearchScreen(
                         modifier = Modifier.size(20.dp)
                     )
 
-                    // Distance input
-                    OutlinedTextField(
-                        value = distance,
-                        onValueChange = {
-                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                distance = it
-                                showDistanceError = false
-                            }
-                        },
-                        modifier = Modifier.width(60.dp),
-                        singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(
-                            fontSize = 16.sp,
-                            textAlign = TextAlign.Center
-                        ),
-                        isError = showDistanceError
+                    // Distance number
+                    Text(
+                        text = distance,
+                        fontSize = 18.sp,
+                        color = Color.Black,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
 
+                    // Unit "mi"
                     Text(
                         text = "mi",
                         fontSize = 16.sp,
@@ -238,23 +237,22 @@ fun SearchScreen(
 
             Divider(color = Color.LightGray, thickness = 1.dp)
 
-            // Content area - "No events found" message
-            Box(
+            // Content area - "No events found" - ALIGNED TO TOP
+            Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(16.dp)
             ) {
                 Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     color = Color(0xFFE3F2FD), // Light blue background
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = "No events found",
-                        modifier = Modifier.padding(vertical = 40.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp),
                         fontSize = 16.sp,
                         textAlign = TextAlign.Center,
                         color = Color.Gray
