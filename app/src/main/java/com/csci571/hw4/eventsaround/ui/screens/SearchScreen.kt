@@ -2,15 +2,18 @@ package com.csci571.hw4.eventsaround.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -18,29 +21,27 @@ import com.csci571.hw4.eventsaround.data.model.SearchParams
 import com.csci571.hw4.eventsaround.ui.viewmodel.SearchViewModel
 
 /**
- * Search Screen - Main form for searching events
- * User inputs: keyword, distance, location, category
+ * Search Screen - Event search form
+ * Matches the design from screenshot 2
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onNavigateToResults: () -> Unit,
+    onNavigateBack: () -> Unit = {},
     viewModel: SearchViewModel = viewModel()
 ) {
     // Form state variables
     var keyword by remember { mutableStateOf("") }
     var distance by remember { mutableStateOf("10") }
-    var location by remember { mutableStateOf("Current Location") }
     var selectedCategory by remember { mutableIntStateOf(0) }
 
     // Error states
     var showKeywordError by remember { mutableStateOf(false) }
     var showDistanceError by remember { mutableStateOf(false) }
 
-    // Category names
+    // Category names and mapping
     val categories = listOf("All", "Music", "Sports", "Arts & Theatre", "Film", "Miscellaneous")
-
-    // Map categories to segment IDs
     val categorySegmentIds = mapOf(
         0 to SearchParams.CATEGORY_ALL,
         1 to SearchParams.CATEGORY_MUSIC,
@@ -53,12 +54,79 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Event Search") },
-                actions = {
-                    IconButton(onClick = { /* Search icon in top bar */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                title = {
+                    // Search input field in the top bar
+                    OutlinedTextField(
+                        value = keyword,
+                        onValueChange = {
+                            keyword = it
+                            showKeywordError = false
+                        },
+                        placeholder = {
+                            Text(
+                                "Search events...",
+                                color = Color.Gray,
+                                fontSize = 16.sp
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent
+                        ),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 16.sp)
+                    )
+                },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
                     }
-                }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        // Validate and perform search
+                        var hasError = false
+
+                        if (keyword.isBlank()) {
+                            showKeywordError = true
+                            hasError = true
+                        }
+
+                        val distanceValue = distance.toIntOrNull()
+                        if (distanceValue == null || distanceValue <= 0) {
+                            showDistanceError = true
+                            hasError = true
+                        }
+
+                        if (!hasError) {
+                            val searchParams = SearchParams(
+                                keyword = keyword.trim(),
+                                distance = distanceValue!!,
+                                category = categorySegmentIds[selectedCategory] ?: "",
+                                autoDetect = true,
+                                latitude = null,
+                                longitude = null
+                            )
+                            viewModel.searchEvents(searchParams)
+                            onNavigateToResults()
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = Color.Red
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFE3F2FD) // Light blue background
+                )
             )
         }
     ) { paddingValues ->
@@ -66,156 +134,131 @@ fun SearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Keyword input field
-            OutlinedTextField(
-                value = keyword,
-                onValueChange = {
-                    keyword = it
-                    showKeywordError = false
-                },
-                label = { Text("Keyword") },
-                placeholder = { Text("Search events...") },
-                modifier = Modifier.fillMaxWidth(),
-                isError = showKeywordError,
-                supportingText = {
-                    if (showKeywordError) {
-                        Text(
-                            text = "Keyword is required",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                },
-                singleLine = true
-            )
-
-            // Distance input
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = distance,
-                    onValueChange = {
-                        // Only allow numbers
-                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                            distance = it
-                            showDistanceError = false
-                        }
-                    },
-                    label = { Text("Distance") },
-                    modifier = Modifier.weight(1f),
-                    isError = showDistanceError,
-                    supportingText = {
-                        if (showDistanceError) {
-                            Text(
-                                text = "Distance must be greater than 0",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    },
-                    singleLine = true
+            // Error message for keyword
+            if (showKeywordError) {
+                Text(
+                    text = "Keyword is required",
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
-
-                Text("mi", modifier = Modifier.padding(top = 8.dp))
             }
 
-            // Location dropdown (simplified - using default location)
-            OutlinedTextField(
-                value = location,
-                onValueChange = { },
-                label = { Text("Location") },
-                modifier = Modifier.fillMaxWidth(),
-                readOnly = true,
-                trailingIcon = {
-                    Icon(Icons.Default.LocationOn, "Location")
+            // Location row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Location icon and text
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Current Location",
+                        fontSize = 16.sp,
+                        color = Color.Black
+                    )
                 }
-            )
+
+                // Distance controls
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search, // Replace with swap icon
+                        contentDescription = "Distance",
+                        tint = Color.Gray,
+                        modifier = Modifier.size(20.dp)
+                    )
+
+                    // Distance input
+                    OutlinedTextField(
+                        value = distance,
+                        onValueChange = {
+                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                distance = it
+                                showDistanceError = false
+                            }
+                        },
+                        modifier = Modifier.width(60.dp),
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center
+                        ),
+                        isError = showDistanceError
+                    )
+
+                    Text(
+                        text = "mi",
+                        fontSize = 16.sp,
+                        color = Color.Black
+                    )
+                }
+            }
 
             // Category tabs
             ScrollableTabRow(
                 selectedTabIndex = selectedCategory,
                 modifier = Modifier.fillMaxWidth(),
-                edgePadding = 0.dp
+                edgePadding = 0.dp,
+                containerColor = Color.White,
+                contentColor = Color.Black
             ) {
                 categories.forEachIndexed { index, category ->
                     Tab(
                         selected = selectedCategory == index,
                         onClick = { selectedCategory = index },
-                        text = { Text(category) }
+                        text = {
+                            Text(
+                                category,
+                                fontSize = 14.sp,
+                                color = if (selectedCategory == index)
+                                    Color(0xFF1976D2)
+                                else
+                                    Color.Black
+                            )
+                        }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Divider(color = Color.LightGray, thickness = 1.dp)
 
-            // Action buttons row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            // Content area - "No events found" message
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
             ) {
-                // Submit/Search button
-                Button(
-                    onClick = {
-                        // Validate inputs before proceeding
-                        var hasError = false
-
-                        // Check if keyword is empty
-                        if (keyword.isBlank()) {
-                            showKeywordError = true
-                            hasError = true
-                        }
-
-                        // Check if distance is valid
-                        val distanceValue = distance.toIntOrNull()
-                        if (distanceValue == null || distanceValue <= 0) {
-                            showDistanceError = true
-                            hasError = true
-                        }
-
-                        // Navigate to results if validation passes
-                        if (!hasError) {
-                            // Create search params
-                            val searchParams = SearchParams(
-                                keyword = keyword.trim(),
-                                distance = distanceValue!!,
-                                category = categorySegmentIds[selectedCategory] ?: "",
-                                location = location,
-                                autoDetect = true,  // Using current location by default
-                                latitude = null,  // Will use default coordinates in SearchParams
-                                longitude = null
-                            )
-
-                            // Trigger search
-                            viewModel.searchEvents(searchParams)
-
-                            // Navigate to results
-                            onNavigateToResults()
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    color = Color(0xFFE3F2FD), // Light blue background
+                    shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("SEARCH")
-                }
-
-                // Clear button
-                OutlinedButton(
-                    onClick = {
-                        // Reset all form fields to default values
-                        keyword = ""
-                        distance = "10"
-                        location = "Current Location"
-                        selectedCategory = 0
-                        showKeywordError = false
-                        showDistanceError = false
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("CLEAR")
+                    Text(
+                        text = "No events found",
+                        modifier = Modifier.padding(vertical = 40.dp),
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        color = Color.Gray
+                    )
                 }
             }
         }

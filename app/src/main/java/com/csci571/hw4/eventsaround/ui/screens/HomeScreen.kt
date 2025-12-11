@@ -6,7 +6,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,34 +20,51 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Home/Favorites screen displaying saved favorite events
- * Shows "No favorites" message when empty
- * Includes current date and "Powered by Ticketmaster" link
+ * Home Screen - Favorites List
+ * Displays favorite events with "Powered by Ticketmaster" link
+ * Content aligned to top (not centered)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onEventClick: (String) -> Unit
+    onEventClick: (String) -> Unit,
+    onSearchClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
     // TODO: Replace with actual favorites from repository
     val favoriteEvents = remember { mutableStateListOf<FavoriteEvent>() }
 
-    // Get current date
+    // Format current date as "11 November 2025"
     val currentDate = remember {
-        SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date())
+        SimpleDateFormat("dd MMMM yyyy", Locale.ENGLISH).format(Date())
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Event Search") }
+                title = {
+                    Text(
+                        "Event Search",
+                        fontSize = 20.sp
+                    )
+                },
+                actions = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFE3F2FD) // Light blue background
+                )
             )
         }
     ) { paddingValues ->
@@ -54,73 +73,55 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Current date
+            // Current date display - at the top
             Text(
                 text = currentDate,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
                 fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color.Gray
             )
 
-            // Favorites section header
+            // "Favorites" header
             Text(
                 text = "Favorites",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
             )
 
+            // Content area - aligned to top
             if (favoriteEvents.isEmpty()) {
-                // Empty state
-                Box(
+                // Empty state - "No favorites" card at the top
+                Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(32.dp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFFE3F2FD), // Light blue background
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Surface(
+                        Text(
+                            text = "No favorites",
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 24.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = MaterialTheme.shapes.medium
-                        ) {
-                            Text(
-                                text = "No favorites",
-                                modifier = Modifier.padding(vertical = 32.dp),
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(32.dp))
-
-                        // Powered by Ticketmaster link
-                        Text(
-                            text = "Powered by Ticketmaster",
-                            modifier = Modifier.clickable {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.ticketmaster.com"))
-                                context.startActivity(intent)
-                            },
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 12.sp
+                                .padding(vertical = 40.dp),
+                            fontSize = 16.sp,
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
                         )
                     }
                 }
             } else {
-                // Favorites list
+                // Favorites list - starts from top
                 LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -131,28 +132,35 @@ fun HomeScreen(
                         )
                     }
                 }
-
-                // Powered by Ticketmaster at bottom
-                Text(
-                    text = "Powered by Ticketmaster",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.ticketmaster.com"))
-                            context.startActivity(intent)
-                        }
-                        .padding(16.dp),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center
-                )
             }
+
+            // Spacer to push "Powered by Ticketmaster" to bottom
+            Spacer(modifier = Modifier.weight(1f))
+
+            // "Powered by Ticketmaster" link at the bottom
+            Text(
+                text = "Powered by Ticketmaster",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://www.ticketmaster.com")
+                        )
+                        context.startActivity(intent)
+                    }
+                    .padding(vertical = 16.dp),
+                fontSize = 14.sp,
+                color = Color.Gray,
+                textAlign = TextAlign.Center,
+                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+            )
         }
     }
 }
 
 /**
- * Card component for displaying a favorite event
+ * Favorite event card component
  */
 @Composable
 fun FavoriteEventCard(
@@ -172,42 +180,31 @@ fun FavoriteEventCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                // Event image
-                AsyncImage(
-                    model = event.imageUrl,
-                    contentDescription = event.name,
-                    modifier = Modifier.size(60.dp)
+                Text(
+                    text = event.name,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
                 )
-
-                // Event details
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = event.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        maxLines = 2
-                    )
-                    Text(
-                        text = event.venue,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = event.dateTime,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = event.venue,
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = event.dateTime,
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
             }
 
             // Read-only star icon
             Icon(
-                imageVector = Icons.Default.Star,
+                imageVector = Icons.Default.Star, // Filled star icon
                 contentDescription = "Favorite",
                 tint = Color(0xFFFFD700), // Gold color
                 modifier = Modifier.size(24.dp)
@@ -217,13 +214,12 @@ fun FavoriteEventCard(
 }
 
 /**
- * Data class representing a favorite event
- * TODO: Move to data/model package
+ * Data class for favorite event
  */
 data class FavoriteEvent(
     val id: String,
     val name: String,
     val venue: String,
     val dateTime: String,
-    val imageUrl: String
+    val imageUrl: String = ""
 )

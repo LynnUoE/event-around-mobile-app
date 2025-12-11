@@ -1,6 +1,8 @@
 package com.csci571.hw4.eventsaround.ui.screens
 
 import android.content.Intent
+import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.csci571.hw4.eventsaround.data.model.EventDetails
 import com.csci571.hw4.eventsaround.ui.viewmodel.EventDetailsViewModel
+import androidx.compose.foundation.clickable
 
 /**
  * Details Screen - Shows comprehensive information about a single event
@@ -425,12 +428,26 @@ fun DetailRow(label: String, value: String) {
 }
 
 /**
- * Album card composable
+ * Album card composable - clickable to open in Spotify
  */
 @Composable
 fun AlbumCard(album: com.csci571.hw4.eventsaround.data.model.Album) {
+    val context = LocalContext.current
+
     Card(
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                // Open album in Spotify when clicked
+                album.external_urls.spotify?.let { spotifyUrl ->
+                    try {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spotifyUrl))
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.e("AlbumCard", "Failed to open Spotify URL", e)
+                    }
+                }
+            }
     ) {
         Row(
             modifier = Modifier.padding(8.dp),
