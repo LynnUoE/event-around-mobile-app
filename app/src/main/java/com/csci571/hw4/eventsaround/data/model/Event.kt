@@ -116,6 +116,16 @@ data class Classification(
     val genre: Genre?
 )
 
+
+/**
+ * API Response wrapper
+ */
+
+data class EmbeddedEvents(
+    @SerializedName("events")
+    val events: List<Event>
+)
+
 data class Segment(
     @SerializedName("name")
     val name: String = ""
@@ -139,32 +149,30 @@ data class EventImage(
 
 data class PriceRange(
     @SerializedName("min")
-    val min: Double?,
+    val min: Double? = null,
 
     @SerializedName("max")
-    val max: Double?
+    val max: Double? = null,
+
+    @SerializedName("currency")
+    val currency: String = "USD"
 )
 
 data class Attraction(
     @SerializedName("name")
     val name: String = "",
 
-    @SerializedName("images")
-    val images: List<EventImage>? = null,
-
-    @SerializedName("url")
-    val url: String? = null
+    @SerializedName("id")
+    val id: String = ""
 )
 
-/**
- * API Response wrapper
- */
+// API Response wrapper
 data class EventListResponse(
     @SerializedName("_embedded")
-    val embedded: EmbeddedEvents?
+    val embedded: EventListEmbedded?
 )
 
-data class EmbeddedEvents(
+data class EventListEmbedded(
     @SerializedName("events")
     val events: List<Event>
 )
