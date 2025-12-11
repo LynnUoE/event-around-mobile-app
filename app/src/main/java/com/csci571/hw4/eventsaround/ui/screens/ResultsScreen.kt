@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
@@ -12,13 +13,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.csci571.hw4.eventsaround.data.model.Event
+import com.csci571.hw4.eventsaround.ui.viewmodel.SearchViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
 /**
  * Results Screen - Displays search results in a scrollable list
@@ -28,20 +35,13 @@ import coil.compose.AsyncImage
 @Composable
 fun ResultsScreen(
     onNavigateBack: () -> Unit,
-    onEventClick: (String) -> Unit
+    onEventClick: (String) -> Unit,
+    viewModel: SearchViewModel = viewModel()
 ) {
-    // TODO: Get actual search results from ViewModel/Repository
-    val searchResults = remember { mutableStateListOf<SearchResultEvent>() }
-    val isLoading by remember { mutableStateOf(false) }
-
-    // Temporary: Simulate loading results
-    LaunchedEffect(Unit) {
-        // TODO: Replace with actual API call
-        // Example: viewModel.searchEvents(searchParams)
-        searchResults.clear()
-        // For testing, you can add sample data:
-        // searchResults.addAll(getSampleEvents())
-    }
+    // Collect states from ViewModel
+    val searchResults by viewModel.searchResults.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     Scaffold(
         topBar = {
@@ -71,39 +71,57 @@ fun ResultsScreen(
                     )
                 }
 
-                searchResults.isEmpty() -> {
-                    // Show "No events found" message when results are empty
-                    Surface(
+                error != null -> {
+                    // Show error message
+                    Column(
                         modifier = Modifier
                             .align(Alignment.Center)
-                            .padding(32.dp)
-                            .fillMaxWidth(0.8f),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = MaterialTheme.shapes.medium
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Error: ${error}",
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = { viewModel.clearError() }) {
+                            Text("Dismiss")
+                        }
+                    }
+                }
+
+                searchResults.isEmpty() -> {
+                    // Show "No events found" message when results list is empty
+                    Card(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
                             text = "No events found",
-                            modifier = Modifier.padding(vertical = 32.dp),
+                            modifier = Modifier.padding(32.dp),
                             style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
 
                 else -> {
-                    // Display results list
+                    // Display search results in a scrollable list
                     LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(searchResults) { event ->
-                            SearchResultCard(
+                            EventResultCard(
                                 event = event,
-                                onClick = { onEventClick(event.id) },
-                                onFavoriteToggle = {
-                                    // TODO: Toggle favorite status in repository
-                                }
+                                onClick = { onEventClick(event.id) }
                             )
                         }
                     }
@@ -114,16 +132,15 @@ fun ResultsScreen(
 }
 
 /**
- * Card component for displaying a search result event
- * Shows event image, details, category badge, and favorite button
+ * Event card component for search results
+ * Uses Event model's helper properties for easy access
  */
 @Composable
-fun SearchResultCard(
-    event: SearchResultEvent,
-    onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit
+fun EventResultCard(
+    event: Event,
+    onClick: () -> Unit
 ) {
-    var isFavorite by remember { mutableStateOf(event.isFavorite) }
+    var isFavorite by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -134,24 +151,28 @@ fun SearchResultCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(12.dp)
         ) {
-            // Event image
+            // Event image - using helper property
             AsyncImage(
                 model = event.imageUrl,
-                contentDescription = event.name,
+                contentDescription = "Event image",
                 modifier = Modifier
-                    .size(80.dp),
+                    .size(100.dp)
+                    .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
 
-            // Event details column
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Event details
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Event name
+                // Event name - direct property
                 Text(
                     text = event.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -159,43 +180,50 @@ fun SearchResultCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Venue name
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Venue name - using helper property
                 Text(
-                    text = event.venue,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = event.venue.ifEmpty { "Venue TBA" },
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Date and time
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Date and time - using helper properties
                 Text(
-                    text = event.dateTime,
+                    text = formatDateTime(event.date, event.time),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                // Category badge (optional)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Category badge - using helper property
                 if (event.category.isNotEmpty()) {
                     Surface(
                         color = getCategoryColor(event.category),
-                        shape = MaterialTheme.shapes.small
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.wrapContentWidth()
                     ) {
                         Text(
                             text = event.category,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 10.sp,
+                            style = MaterialTheme.typography.labelSmall,
                             color = Color.White
                         )
                     }
                 }
             }
 
-            // Favorite toggle button
+            // Favorite button
             IconButton(
                 onClick = {
                     isFavorite = !isFavorite
-                    onFavoriteToggle()
+                    // TODO: Add to favorites using repository
                 }
             ) {
                 Icon(
@@ -216,7 +244,7 @@ fun getCategoryColor(category: String): Color {
     return when (category.lowercase()) {
         "music" -> Color(0xFF1DB954)        // Green
         "sports" -> Color(0xFF0066CC)       // Blue
-        "arts & theatre" -> Color(0xFF9C27B0)  // Purple
+        "arts & theatre", "arts" -> Color(0xFF9C27B0)  // Purple
         "film" -> Color(0xFFE91E63)         // Pink
         "miscellaneous" -> Color(0xFF607D8B)   // Blue Grey
         else -> Color(0xFF757575)           // Grey
@@ -224,41 +252,28 @@ fun getCategoryColor(category: String): Color {
 }
 
 /**
- * Data class representing a search result event
- * TODO: Move to data/model package and use actual API response model
+ * Format date and time for display
+ * Converts to "MMM dd, yyyy, h:mm a" format
  */
-data class SearchResultEvent(
-    val id: String,
-    val name: String,
-    val venue: String,
-    val dateTime: String,
-    val imageUrl: String,
-    val category: String,
-    val isFavorite: Boolean = false
-)
+fun formatDateTime(date: String, time: String): String {
+    return try {
+        if (date.isEmpty()) return "Date TBA"
 
-/**
- * Sample data for testing (remove when integrating with API)
- */
-private fun getSampleEvents(): List<SearchResultEvent> {
-    return listOf(
-        SearchResultEvent(
-            id = "1",
-            name = "Sample Concert Event",
-            venue = "Madison Square Garden",
-            dateTime = "Dec 15, 2024, 7:30 PM",
-            imageUrl = "https://via.placeholder.com/300",
-            category = "Music",
-            isFavorite = false
-        ),
-        SearchResultEvent(
-            id = "2",
-            name = "Basketball Game",
-            venue = "Staples Center",
-            dateTime = "Dec 20, 2024, 8:00 PM",
-            imageUrl = "https://via.placeholder.com/300",
-            category = "Sports",
-            isFavorite = true
-        )
-    )
+        val dateStr = if (time.isNotEmpty()) {
+            // Combine date and time
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+            val outputFormat = SimpleDateFormat("MMM dd, yyyy, h:mm a", Locale.US)
+            val parsedDate = inputFormat.parse("$date $time")
+            outputFormat.format(parsedDate ?: Date())
+        } else {
+            // Date only
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val outputFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+            val parsedDate = inputFormat.parse(date)
+            outputFormat.format(parsedDate ?: Date())
+        }
+        dateStr
+    } catch (e: Exception) {
+        "Date TBA"
+    }
 }
