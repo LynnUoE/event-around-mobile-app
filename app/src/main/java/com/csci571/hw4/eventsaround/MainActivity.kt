@@ -4,44 +4,34 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.*
+import com.csci571.hw4.eventsaround.ui.navigation.AppNavigation
+import com.csci571.hw4.eventsaround.ui.screens.SplashScreen
 import com.csci571.hw4.eventsaround.ui.theme.EventsAroundTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Switch from splash theme to normal theme before super.onCreate()
+        setTheme(R.style.Theme_EventFinder)
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             EventsAroundTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+                var showSplash by remember { mutableStateOf(true) }
+
+                if (showSplash) {
+                    SplashScreen(
+                        onSplashFinished = {
+                            showSplash = false
+                        }
                     )
+                } else {
+                    // Main app navigation
+                    AppNavigation()
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    EventsAroundTheme {
-        Greeting("Android")
     }
 }

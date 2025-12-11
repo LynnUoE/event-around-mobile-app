@@ -2,9 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-
-
-
+    id("org.jetbrains.kotlin.plugin.serialization") // Add this line
 }
 
 android {
@@ -34,14 +32,15 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11 // Update to Java 11
+        targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "11" // Update to match Java 11
     }
     buildFeatures {
         compose = true
+        buildConfig = true // Enable BuildConfig for debug/release differentiation
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -67,8 +66,16 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    // Navigation for Compose
+
+    // Compose
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.7")
+
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
     // Networking - Retrofit & OkHttp
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -100,6 +107,13 @@ dependencies {
 
     // Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+
+    // Navigation for Compose
+    val navVersion = "2.7.6"
+    implementation("androidx.navigation:navigation-compose:$navVersion")
+
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("androidx.compose.material:material-icons-extended")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

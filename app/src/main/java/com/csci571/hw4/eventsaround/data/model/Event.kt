@@ -1,163 +1,242 @@
 package com.csci571.hw4.eventsaround.data.model
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import com.google.gson.annotations.SerializedName
 
 // Main response wrapper for event search
-@Serializable
 data class EventsResponse(
-    @SerialName("_embedded")
+    @SerializedName("_embedded")
     val embedded: EmbeddedEvents? = null,
+
+    @SerializedName("page")
     val page: PageInfo? = null
 )
 
-@Serializable
 data class EmbeddedEvents(
+    @SerializedName("events")
     val events: List<Event> = emptyList()
 )
 
 // Main Event model
-@Serializable
 data class Event(
+    @SerializedName("id")
     val id: String = "",
+
+    @SerializedName("name")
     val name: String = "",
+
+    @SerializedName("url")
     val url: String? = null,
+
+    @SerializedName("images")
     val images: List<EventImage> = emptyList(),
+
+    @SerializedName("dates")
     val dates: EventDates? = null,
+
+    @SerializedName("classifications")
     val classifications: List<Classification> = emptyList(),
-    @SerialName("_embedded")
+
+    @SerializedName("_embedded")
     val embedded: EventEmbedded? = null,
+
+    @SerializedName("priceRanges")
     val priceRanges: List<PriceRange>? = null,
+
+    @SerializedName("seatmap")
     val seatmap: SeatMap? = null
 )
 
 // Event Image
-@Serializable
 data class EventImage(
+    @SerializedName("url")
     val url: String = "",
+
+    @SerializedName("ratio")
     val ratio: String? = null,
+
+    @SerializedName("width")
     val width: Int? = null,
+
+    @SerializedName("height")
     val height: Int? = null
 )
 
 // Date and Time information
-@Serializable
 data class EventDates(
+    @SerializedName("start")
     val start: DateStart? = null,
+
+    @SerializedName("status")
     val status: DateStatus? = null,
+
+    @SerializedName("timezone")
     val timezone: String? = null
 )
 
-@Serializable
 data class DateStart(
+    @SerializedName("localDate")
     val localDate: String? = null,
+
+    @SerializedName("localTime")
     val localTime: String? = null,
+
+    @SerializedName("dateTime")
     val dateTime: String? = null
 )
 
-@Serializable
 data class DateStatus(
+    @SerializedName("code")
     val code: String? = null
 )
 
 // Classification - Category information
-@Serializable
 data class Classification(
+    @SerializedName("segment")
     val segment: Segment? = null,
+
+    @SerializedName("genre")
     val genre: Genre? = null,
+
+    @SerializedName("subGenre")
     val subGenre: SubGenre? = null
 )
 
-@Serializable
 data class Segment(
+    @SerializedName("id")
     val id: String? = null,
+
+    @SerializedName("name")
     val name: String? = null
 )
 
-@Serializable
 data class Genre(
+    @SerializedName("id")
     val id: String? = null,
+
+    @SerializedName("name")
     val name: String? = null
 )
 
-@Serializable
 data class SubGenre(
+    @SerializedName("id")
     val id: String? = null,
+
+    @SerializedName("name")
     val name: String? = null
 )
 
 // Embedded data - venues and attractions
-@Serializable
 data class EventEmbedded(
+    @SerializedName("venues")
     val venues: List<Venue> = emptyList(),
+
+    @SerializedName("attractions")
     val attractions: List<Attraction> = emptyList()
 )
 
 // Venue information
-@Serializable
 data class Venue(
+    @SerializedName("id")
     val id: String = "",
+
+    @SerializedName("name")
     val name: String = "",
+
+    @SerializedName("url")
     val url: String? = null,
+
+    @SerializedName("city")
     val city: City? = null,
+
+    @SerializedName("state")
     val state: State? = null,
+
+    @SerializedName("location")
     val location: Location? = null,
+
+    @SerializedName("address")
     val address: Address? = null,
+
+    @SerializedName("images")
     val images: List<EventImage> = emptyList()
 )
 
-@Serializable
 data class City(
+    @SerializedName("name")
     val name: String? = null
 )
 
-@Serializable
 data class State(
+    @SerializedName("name")
     val name: String? = null,
+
+    @SerializedName("stateCode")
     val stateCode: String? = null
 )
 
-@Serializable
 data class Location(
+    @SerializedName("longitude")
     val longitude: String? = null,
+
+    @SerializedName("latitude")
     val latitude: String? = null
 )
 
-@Serializable
 data class Address(
+    @SerializedName("line1")
     val line1: String? = null
 )
 
 // Attraction - Artist or Team
-@Serializable
 data class Attraction(
+    @SerializedName("id")
     val id: String = "",
+
+    @SerializedName("name")
     val name: String = "",
+
+    @SerializedName("url")
     val url: String? = null,
+
+    @SerializedName("images")
     val images: List<EventImage> = emptyList(),
+
+    @SerializedName("classifications")
     val classifications: List<Classification> = emptyList()
 )
 
 // Price Range
-@Serializable
 data class PriceRange(
+    @SerializedName("type")
     val type: String? = null,
+
+    @SerializedName("currency")
     val currency: String? = null,
+
+    @SerializedName("min")
     val min: Double? = null,
+
+    @SerializedName("max")
     val max: Double? = null
 )
 
 // Seat Map
-@Serializable
 data class SeatMap(
+    @SerializedName("staticUrl")
     val staticUrl: String? = null
 )
 
 // Page information
-@Serializable
 data class PageInfo(
+    @SerializedName("size")
     val size: Int = 0,
+
+    @SerializedName("totalElements")
     val totalElements: Int = 0,
+
+    @SerializedName("totalPages")
     val totalPages: Int = 0,
+
+    @SerializedName("number")
     val number: Int = 0
 )
