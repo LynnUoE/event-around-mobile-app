@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 
 /**
  * Complete event details from Ticketmaster API
+ * Note: VenueCity, VenueState, VenueLocation are defined in Event.kt
  */
 data class EventDetails(
     @SerializedName("id")
@@ -19,7 +20,7 @@ data class EventDetails(
     val images: List<EventImage>?,
 
     @SerializedName("dates")
-    val dates: EventDates?,
+    val dates: EventDetailsDate?,  // ✅ 使用 EventDetailsDate 避免冲突
 
     @SerializedName("classifications")
     val classifications: List<EventClassification>?,
@@ -34,7 +35,11 @@ data class EventDetails(
     val _embedded: EventDetailsEmbedded?
 )
 
-data class EventDates(
+// ========================================
+// Date and Time information (renamed to avoid conflict)
+// ========================================
+
+data class EventDetailsDate(  // ✅ 重命名避免与 Event.kt 中的 EventDates 冲突
     @SerializedName("start")
     val start: EventStartDate?,
 
@@ -52,8 +57,12 @@ data class EventStartDate(
 
 data class EventStatus(
     @SerializedName("code")
-    val code: String?  // "onsale", "offsale", "canceled", etc.
+    val code: String?  // Values: "onsale", "offsale", "canceled", "postponed", etc.
 )
+
+// ========================================
+// Classification (Category/Genre) information
+// ========================================
 
 data class EventClassification(
     @SerializedName("segment")
@@ -97,18 +106,30 @@ data class EventSubType(
     val name: String?
 )
 
+// ========================================
+// Seatmap information
+// ========================================
+
 data class Seatmap(
     @SerializedName("staticUrl")
     val staticUrl: String?
 )
+
+// ========================================
+// Embedded data (Venues and Attractions)
+// ========================================
 
 data class EventDetailsEmbedded(
     @SerializedName("venues")
     val venues: List<VenueDetails>?,
 
     @SerializedName("attractions")
-    val attractions: List<Attraction>?
+    val attractions: List<Attraction>?  // Attraction is defined in Event.kt
 )
+
+// ========================================
+// Venue information (VenueDetails to avoid conflict with Venue)
+// ========================================
 
 data class VenueDetails(
     @SerializedName("name")
@@ -118,13 +139,13 @@ data class VenueDetails(
     val address: VenueAddress?,
 
     @SerializedName("city")
-    val city: VenueCity?,
+    val city: VenueCity?,  // ✅ VenueCity is defined in Event.kt
 
     @SerializedName("state")
-    val state: VenueState?,
+    val state: VenueState?,  // ✅ VenueState is defined in Event.kt
 
     @SerializedName("location")
-    val location: VenueLocation?
+    val location: VenueLocation?  // ✅ VenueLocation is defined in Event.kt
 )
 
 data class VenueAddress(
@@ -132,23 +153,7 @@ data class VenueAddress(
     val line1: String?
 )
 
-data class VenueCity(
-    @SerializedName("name")
-    val name: String?
-)
-
-data class VenueState(
-    @SerializedName("name")
-    val name: String?,
-
-    @SerializedName("stateCode")
-    val stateCode: String?
-)
-
-data class VenueLocation(
-    @SerializedName("latitude")
-    val latitude: String?,
-
-    @SerializedName("longitude")
-    val longitude: String?
-)
+// ========================================
+// Note: VenueCity, VenueState, VenueLocation are NOT defined here
+// They are defined in Event.kt and shared between both files
+// ========================================

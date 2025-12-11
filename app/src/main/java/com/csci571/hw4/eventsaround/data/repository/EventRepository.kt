@@ -89,7 +89,9 @@ class EventRepository private constructor() {
                 val response = apiService.getAutocompleteSuggestions(keyword)
 
                 if (response.isSuccessful) {
-                    val suggestions = response.body()?.suggestions ?: emptyList()
+                    // Extract attraction names from the response
+                    val suggestions = response.body()?._embedded?.attractions
+                        ?.map { it.name } ?: emptyList()
                     Log.d(TAG, "Autocomplete: Found ${suggestions.size} suggestions")
                     Result.success(suggestions)
                 } else {
@@ -107,7 +109,7 @@ class EventRepository private constructor() {
     /**
      * Search for artist on Spotify
      */
-    suspend fun searchSpotifyArtist(artistName: String): Result<SpotifyArtist> {
+    suspend fun searchSpotifyArtist(artistName: String): Result<SpotifyArtist?> {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Searching Spotify for artist: $artistName")
@@ -116,10 +118,16 @@ class EventRepository private constructor() {
 
                 if (response.isSuccessful) {
                     response.body()?.let { searchResponse ->
-                        Log.d(TAG, "Artist found on Spotify")
-                        // Extract artist from the response wrapper
-                        Result.success(searchResponse.artist)
-                    } ?: Result.failure(Exception("Artist not found"))
+                        // Get the first artist from the results
+                        val artist = searchResponse.artists?.items?.firstOrNull()
+                        if (artist != null) {
+                            Log.d(TAG, "Artist found on Spotify: ${artist.name}")
+                            Result.success(artist)
+                        } else {
+                            Log.d(TAG, "No artist found on Spotify")
+                            Result.success(null)
+                        }
+                    } ?: Result.success(null)
                 } else {
                     Result.failure(
                         Exception("Spotify API Error: ${response.code()}")
@@ -144,7 +152,7 @@ class EventRepository private constructor() {
 
                 if (response.isSuccessful) {
                     response.body()?.let { albumsResponse ->
-                        val albums = albumsResponse.albums
+                        val albums = albumsResponse.items
                         Log.d(TAG, "Found ${albums.size} albums")
                         Result.success(albums)
                     } ?: Result.failure(Exception("Albums not found"))
@@ -161,9 +169,10 @@ class EventRepository private constructor() {
     }
 
     /**
-     * Get venue details from Google Places
+     * Get venue details (if your backend provides this)
+     * This is optional - Google Maps doesn't need extra venue details
      */
-    suspend fun getVenueDetails(venueName: String): Result<VenueDetails> {
+    suspend fun getVenueDetails(venueName: String): Result<VenueDetails?> {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Fetching venue details: $venueName")
@@ -174,15 +183,34 @@ class EventRepository private constructor() {
                     response.body()?.let {
                         Log.d(TAG, "Venue details fetched")
                         Result.success(it)
-                    } ?: Result.failure(Exception("Venue not found"))
+                    } ?: Result.success(null)
                 } else {
-                    Result.failure(
-                        Exception("API Error: ${response.code()}")
-                    )
+                    // Don't fail - venue details are optional
+                    Log.w(TAG, "Venue details not available: ${response.code()}")
+                    Result.success(null)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Venue details error", e)
-                Result.failure(e)
+                // Don't fail - just return null
+                Result.success(null)
+            }
+        }
+    }
+
+    /**
+     * Get current location from IP (fallback method)
+     */
+    suspend fun getCurrentLocationFromIP(): Result<IPLocation?> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Getting location from IP")
+
+                // If your backend has an IPInfo endpoint, use it
+                // Otherwise return null and use device location
+                Result.success(null)
+            } catch (e: Exception) {
+                Log.e(TAG, "IP location error", e)
+                Result.success(null)
             }
         }
     }

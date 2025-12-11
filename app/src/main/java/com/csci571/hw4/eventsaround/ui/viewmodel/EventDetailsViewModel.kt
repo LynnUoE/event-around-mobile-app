@@ -1,6 +1,7 @@
 package com.csci571.hw4.eventsaround.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.csci571.hw4.eventsaround.data.model.*
@@ -11,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-import com.csci571.hw4.eventsaround.data.repository.*
 /**
  * ViewModel for Event Details Screen
  * Manages event details, artist info, venue info, and favorite status
@@ -20,6 +20,7 @@ class EventDetailsViewModel(application: Application) : AndroidViewModel(applica
 
     private val eventRepository = EventRepository.getInstance()
     private val favoritesRepository = FavoritesRepository.getInstance(application)
+    private val TAG = "EventDetailsViewModel"
 
     // Event details state
     private val _eventDetails = MutableStateFlow<EventDetails?>(null)
@@ -32,10 +33,6 @@ class EventDetailsViewModel(application: Application) : AndroidViewModel(applica
     // Albums data
     private val _albums = MutableStateFlow<List<Album>>(emptyList())
     val albums: StateFlow<List<Album>> = _albums.asStateFlow()
-
-    // Venue details
-    private val _venueDetails = MutableStateFlow<VenueDetails?>(null)
-    val venueDetails: StateFlow<VenueDetails?> = _venueDetails.asStateFlow()
 
     // Favorite status
     private val _isFavorite = MutableStateFlow(false)
@@ -64,18 +61,26 @@ class EventDetailsViewModel(application: Application) : AndroidViewModel(applica
                 _isLoadingDetails.value = true
                 _error.value = null
 
+                Log.d(TAG, "Loading event details for: $eventId")
+
                 val result = eventRepository.getEventDetails(eventId)
 
                 if (result.isSuccess) {
-                    _eventDetails.value = result.getOrNull()
+                    val details = result.getOrNull()
+                    _eventDetails.value = details
+
                     // Check favorite status
                     _isFavorite.value = favoritesRepository.isFavorite(eventId)
+
+                    Log.d(TAG, "Event details loaded: ${details?.name}")
                 } else {
                     _error.value = result.exceptionOrNull()?.message
                         ?: "Failed to load event details"
+                    Log.e(TAG, "Failed to load event details: ${_error.value}")
                 }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Unknown error"
+                Log.e(TAG, "Error loading event details", e)
             } finally {
                 _isLoadingDetails.value = false
             }
@@ -90,20 +95,32 @@ class EventDetailsViewModel(application: Application) : AndroidViewModel(applica
             try {
                 _isLoadingArtist.value = true
 
-                val result = eventRepository.searchSpotifyArtist(artistName)
+                Log.d(TAG, "Loading artist data for: $artistName")
 
-                if (result.isSuccess) {
-                    // result.getOrNull() already returns SpotifyArtist (not the wrapper)
-                    val artist = result.getOrNull()
+                // Search for artist
+                val artistResult = eventRepository.searchSpotifyArtist(artistName)
+
+                if (artistResult.isSuccess) {
+                    val artist = artistResult.getOrNull()
                     _artistData.value = artist
 
-                    // Load albums if artist found
-                    artist?.id?.let { artistId ->
-                        loadArtistAlbums(artistId)
+                    // If artist found, load albums
+                    if (artist != null) {
+                        Log.d(TAG, "Artist found: ${artist.name}")
+                        loadArtistAlbums(artist.id)
+                    } else {
+                        Log.d(TAG, "No artist found for: $artistName")
+                        _albums.value = emptyList()
                     }
+                } else {
+                    Log.e(TAG, "Failed to load artist: ${artistResult.exceptionOrNull()?.message}")
+                    _artistData.value = null
+                    _albums.value = emptyList()
                 }
             } catch (e: Exception) {
-                // Silently fail for artist data
+                Log.e(TAG, "Error loading artist data", e)
+                _artistData.value = null
+                _albums.value = emptyList()
             } finally {
                 _isLoadingArtist.value = false
             }
@@ -113,35 +130,114 @@ class EventDetailsViewModel(application: Application) : AndroidViewModel(applica
     /**
      * Load artist albums from Spotify
      */
-    private fun loadArtistAlbums(artistId: String) {
+    private suspend fun loadArtistAlbums(artistId: String) {
+        try {
+            Log.d(TAG, "Loading albums for artist: $artistId")
+
+            val albumsResult = eventRepository.getArtistAlbums(artistId)
+
+            if (albumsResult.isSuccess) {
+                val albums = albumsResult.getOrNull() ?: emptyList()
+                // Sort albums by release date (newest first)
+                _albums.value = albums.sortedByDescending { it.release_date }
+                Log.d(TAG, "Loaded ${albums.size} albums")
+            } else {
+                Log.e(TAG, "Failed to load albums: ${albumsResult.exceptionOrNull()?.message}")
+                _albums.value = emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading albums", e)
+            _albums.value = emptyList()
+        }
+    }
+
+    /**
+     * Toggle favorite status
+     * Convert EventDetails to Event for storage
+     */
+    fun toggleFavorite() {
         viewModelScope.launch {
             try {
-                val result = eventRepository.getArtistAlbums(artistId)
+                val eventDetails = _eventDetails.value ?: return@launch
 
-                if (result.isSuccess) {
-                    _albums.value = result.getOrNull() ?: emptyList()
+                Log.d(TAG, "Toggling favorite for event: ${eventDetails.id}")
+
+                // Convert EventDetails to Event for favorites storage
+                // ✅ 注意：EventDetails 使用 EventDetailsDate，Event 使用 EventDates
+                val favoriteEvent = Event(
+                    id = eventDetails.id,
+                    name = eventDetails.name,
+
+                    // ✅ 转换 EventDetailsDate 为 EventDates
+                    dates = eventDetails.dates?.let { detailsDate ->
+                        EventDates(
+                            start = detailsDate.start?.let { startDate ->
+                                EventDate(
+                                    localDate = startDate.localDate,
+                                    localTime = startDate.localTime
+                                )
+                            }
+                        )
+                    },
+
+                    // 转换 embedded
+                    embedded = eventDetails._embedded?.let { detailsEmbedded ->
+                        EventEmbedded(
+                            // Convert VenueDetails list to Venue list
+                            venues = detailsEmbedded.venues?.map { venueDetails ->
+                                Venue(
+                                    name = venueDetails.name,
+                                    city = venueDetails.city,  // ✅ VenueCity 类型相同
+                                    state = venueDetails.state, // ✅ VenueState 类型相同
+                                    location = venueDetails.location // ✅ VenueLocation 类型相同
+                                )
+                            },
+                            attractions = detailsEmbedded.attractions // ✅ Attraction 类型相同
+                        )
+                    },
+
+                    // 转换 classifications
+                    classifications = eventDetails.classifications?.map { eventClassification ->
+                        Classification(
+                            segment = eventClassification.segment?.let { segment ->
+                                Segment(name = segment.name ?: "")
+                            },
+                            genre = eventClassification.genre?.let { genre ->
+                                Genre(name = genre.name ?: "")
+                            }
+                        )
+                    },
+
+                    // 这些字段类型相同，直接复制
+                    images = eventDetails.images,
+                    priceRanges = eventDetails.priceRanges
+                )
+
+                val newFavoriteStatus = if (_isFavorite.value) {
+                    favoritesRepository.removeFavorite(eventDetails.id)
+                    false
+                } else {
+                    favoritesRepository.addFavorite(favoriteEvent)
+                    true
                 }
+
+                _isFavorite.value = newFavoriteStatus
+
+                Log.d(TAG, "Favorite status updated: $newFavoriteStatus")
             } catch (e: Exception) {
-                // Silently fail for albums
+                Log.e(TAG, "Error toggling favorite", e)
             }
         }
     }
 
     /**
-     * Load venue details
+     * Load venue details (optional - coordinates are in EventDetails)
      */
     fun loadVenueDetails(venueName: String) {
         viewModelScope.launch {
             try {
                 _isLoadingVenue.value = true
-
-                val result = eventRepository.getVenueDetails(venueName)
-
-                if (result.isSuccess) {
-                    _venueDetails.value = result.getOrNull()
-                }
-            } catch (e: Exception) {
-                // Silently fail for venue details
+                Log.d(TAG, "Venue details already in EventDetails")
             } finally {
                 _isLoadingVenue.value = false
             }
@@ -149,80 +245,7 @@ class EventDetailsViewModel(application: Application) : AndroidViewModel(applica
     }
 
     /**
-     * Toggle favorite status
-     * @param eventId Event ID to toggle
-     * @param event Optional Event object (if available from search results)
-     */
-    fun toggleFavorite(eventId: String, event: Event? = null): Boolean {
-        // If we have the full Event object, use it
-        if (event != null) {
-            val isNowFavorite = favoritesRepository.toggleFavorite(event)
-            _isFavorite.value = isNowFavorite
-            return isNowFavorite
-        }
-
-        // Otherwise, create a minimal Event from EventDetails
-        val details = _eventDetails.value
-        if (details != null) {
-            val minimalEvent = createMinimalEvent(details, eventId)
-            val isNowFavorite = favoritesRepository.toggleFavorite(minimalEvent)
-            _isFavorite.value = isNowFavorite
-            return isNowFavorite
-        }
-
-        return false
-    }
-
-    /**
-     * Check and update favorite status for current event
-     */
-    fun checkFavoriteStatus(eventId: String) {
-        _isFavorite.value = favoritesRepository.isFavorite(eventId)
-    }
-
-    /**
-     * Create minimal Event object from EventDetails for favorites
-     */
-    private fun createMinimalEvent(details: EventDetails, eventId: String): Event {
-        return Event(
-            id = eventId,
-            name = details.name,
-            dates = EventDates(
-                start = EventDate(
-                    localDate = details.date,
-                    localTime = details.time
-                )
-            ),
-            embedded = EventEmbedded(
-                venues = listOf(
-                    Venue(
-                        name = details.venue.name,
-                        city = VenueCity(""),
-                        state = VenueState(""),
-                        location = null
-                    )
-                ),
-                attractions = details.artists?.map { artistName ->
-                    Attraction(name = artistName)
-                }
-            ),
-            images = if (!details.seatMapUrl.isNullOrEmpty()) {
-                listOf(EventImage(url = details.seatMapUrl))
-            } else emptyList(),
-            classifications = if (!details.genres.isNullOrEmpty()) {
-                listOf(
-                    Classification(
-                        segment = Segment(details.genres.firstOrNull() ?: ""),
-                        genre = Genre(details.genres.firstOrNull() ?: "")
-                    )
-                )
-            } else null,
-            priceRanges = null
-        )
-    }
-
-    /**
-     * Clear error
+     * Clear error message
      */
     fun clearError() {
         _error.value = null

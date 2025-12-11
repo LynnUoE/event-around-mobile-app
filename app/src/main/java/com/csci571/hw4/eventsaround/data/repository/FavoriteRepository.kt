@@ -2,117 +2,176 @@ package com.csci571.hw4.eventsaround.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.csci571.hw4.eventsaround.data.local.PreferencesManager
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import com.csci571.hw4.eventsaround.data.model.Event
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+// Extension to create DataStore
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "event_favorites")
 
 /**
  * Repository for managing favorite events
- * Uses Flow for reactive updates across the app
- * All operations are synchronous since SharedPreferences is fast
+ * Uses DataStore for persistence
  */
-class FavoritesRepository private constructor(context: Context) {
+class FavoritesRepository private constructor(private val context: Context) {
 
-    private val prefsManager = PreferencesManager(context)
+    private val gson = Gson()
+    private val favoritesKey = stringPreferencesKey("favorite_events")
     private val TAG = "FavoritesRepository"
 
-    // StateFlow for reactive favorites list updates
-    private val _favoritesFlow = MutableStateFlow<List<Event>>(emptyList())
-    val favoritesFlow: StateFlow<List<Event>> = _favoritesFlow.asStateFlow()
+    companion object {
+        @Volatile
+        private var instance: FavoritesRepository? = null
 
-    init {
-        // Load initial favorites
-        loadFavorites()
+        fun getInstance(context: Context): FavoritesRepository {
+            return instance ?: synchronized(this) {
+                instance ?: FavoritesRepository(context.applicationContext).also {
+                    instance = it
+                }
+            }
+        }
     }
 
     /**
-     * Add an event to favorites
+     * Get all favorite events
      */
-    fun addFavorite(event: Event) {
+    suspend fun getAllFavorites(): List<Event> {
+        return try {
+            val preferences = context.dataStore.data.first()
+            val favoritesJson = preferences[favoritesKey]
+
+            if (favoritesJson.isNullOrBlank()) {
+                Log.d(TAG, "No favorites found")
+                return emptyList()
+            }
+
+            val type = object : TypeToken<List<Event>>() {}.type
+            val favorites: List<Event> = gson.fromJson(favoritesJson, type) ?: emptyList()
+
+            Log.d(TAG, "Loaded ${favorites.size} favorites")
+            favorites
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading favorites", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Add event to favorites
+     */
+    suspend fun addFavorite(event: Event) {
         try {
-            prefsManager.addFavorite(event)
-            loadFavorites()
-            Log.d(TAG, "Added to favorites: ${event.name}")
+            context.dataStore.edit { preferences ->
+                val currentFavorites = getAllFavorites().toMutableList()
+
+                // Check if already exists
+                if (currentFavorites.any { it.id == event.id }) {
+                    Log.d(TAG, "Event ${event.id} already in favorites")
+                    return@edit
+                }
+
+                // Add to list
+                currentFavorites.add(event)
+
+                // Save to DataStore
+                val json = gson.toJson(currentFavorites)
+                preferences[favoritesKey] = json
+
+                Log.d(TAG, "Added event ${event.id} to favorites. Total: ${currentFavorites.size}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error adding favorite", e)
         }
     }
 
     /**
-     * Remove an event from favorites
+     * Remove event from favorites
      */
-    fun removeFavorite(eventId: String) {
+    suspend fun removeFavorite(eventId: String) {
         try {
-            prefsManager.removeFavorite(eventId)
-            loadFavorites()
-            Log.d(TAG, "Removed from favorites: $eventId")
+            context.dataStore.edit { preferences ->
+                val currentFavorites = getAllFavorites().toMutableList()
+
+                // Remove the event
+                val removed = currentFavorites.removeAll { it.id == eventId }
+
+                if (removed) {
+                    // Save updated list
+                    val json = gson.toJson(currentFavorites)
+                    preferences[favoritesKey] = json
+
+                    Log.d(TAG, "Removed event $eventId from favorites. Remaining: ${currentFavorites.size}")
+                } else {
+                    Log.d(TAG, "Event $eventId not found in favorites")
+                }
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error removing favorite", e)
         }
     }
 
     /**
-     * Check if an event is in favorites (synchronous)
+     * Check if event is in favorites
      */
-    fun isFavorite(eventId: String): Boolean {
-        return prefsManager.isFavorite(eventId)
+    suspend fun isFavorite(eventId: String): Boolean {
+        return try {
+            val favorites = getAllFavorites()
+            val isFav = favorites.any { it.id == eventId }
+            Log.d(TAG, "Event $eventId is favorite: $isFav")
+            isFav
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking favorite", e)
+            false
+        }
     }
 
     /**
-     * Get all favorite events
+     * Toggle favorite status
      */
-    fun getAllFavorites(): List<Event> {
-        return prefsManager.getAllFavorites()
+    suspend fun toggleFavorite(event: Event): Boolean {
+        return try {
+            if (isFavorite(event.id)) {
+                removeFavorite(event.id)
+                false
+            } else {
+                addFavorite(event)
+                true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error toggling favorite", e)
+            false
+        }
     }
 
     /**
      * Clear all favorites
      */
-    fun clearAllFavorites() {
+    suspend fun clearAllFavorites() {
         try {
-            prefsManager.clearFavorites()
-            loadFavorites()
-            Log.d(TAG, "Cleared all favorites")
+            context.dataStore.edit { preferences ->
+                preferences.remove(favoritesKey)
+                Log.d(TAG, "Cleared all favorites")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error clearing favorites", e)
         }
     }
 
     /**
-     * Toggle favorite status of an event
-     * @return true if added, false if removed
+     * Get favorites count
      */
-    fun toggleFavorite(event: Event): Boolean {
-        return if (isFavorite(event.id)) {
-            removeFavorite(event.id)
-            false
-        } else {
-            addFavorite(event)
-            true
-        }
-    }
-
-    /**
-     * Load favorites from preferences and update flow
-     */
-    private fun loadFavorites() {
-        _favoritesFlow.value = prefsManager.getAllFavorites()
-    }
-
-    companion object {
-        @Volatile
-        private var instance: FavoritesRepository? = null
-
-        /**
-         * Get singleton instance of FavoritesRepository
-         */
-        fun getInstance(context: Context): FavoritesRepository {
-            return instance ?: synchronized(this) {
-                instance ?: FavoritesRepository(context.applicationContext)
-                    .also { instance = it }
-            }
+    suspend fun getFavoritesCount(): Int {
+        return try {
+            getAllFavorites().size
+        } catch (e: Exception) {
+            0
         }
     }
 }
