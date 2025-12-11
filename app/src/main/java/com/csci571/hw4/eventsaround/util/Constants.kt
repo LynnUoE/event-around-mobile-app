@@ -1,35 +1,21 @@
 package com.csci571.hw4.eventsaround.util
 object Constants {
-
     const val BASE_URL = "https://csci571-472400.wl.r.appspot.com/"
+    const val DEBUG_MODE = true
 
-    // API endpoints
-    const val SEARCH_EVENTS = "api/events/search"
-    const val EVENT_DETAILS = "api/events/{id}"
-    const val SUGGEST_EVENTS = "api/events/suggest"
-    const val VENUE_DETAILS = "api/events/venue/{name}"
+    // API Endpoints
+    const val ENDPOINT_SEARCH = "api/search"
+    const val ENDPOINT_EVENT_DETAILS = "api/events"
+    const val ENDPOINT_AUTOCOMPLETE = "api/autocomplete"
 
-    // Preferences keys
-    const val FAVORITES_KEY = "favorites"
-    const val PREFERENCES_NAME = "event_finder_prefs"
+    // Network
+    const val TIMEOUT_SECONDS = 30L
+    const val RETRY_COUNT = 3
 
-    // Categories
-    val CATEGORIES = listOf(
-        "All",
-        "Music",
-        "Sports",
-        "Arts & Theatre",
-        "Film",
-        "Miscellaneous"
-    )
+    // Cache
+    const val CACHE_SIZE = 10 * 1024 * 1024L // 10MB
 
-    // Segment IDs for categories
-    val CATEGORY_SEGMENT_MAP = mapOf(
-        "All" to "",
-        "Music" to "KZFzniwnSyZfZ7v7nJ",
-        "Sports" to "KZFzniwnSyZfZ7v7nE",
-        "Arts & Theatre" to "KZFzniwnSyZfZ7v7na",
-        "Film" to "KZFzniwnSyZfZ7v7nn",
-        "Miscellaneous" to "KZFzniwnSyZfZ7v7n1"
-    )
+    // UI
+    const val SPLASH_DELAY_MS = 2000L
+    const val DEBOUNCE_DELAY_MS = 300L
 }
