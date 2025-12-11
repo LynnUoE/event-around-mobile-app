@@ -1,19 +1,23 @@
 package com.csci571.hw4.eventsaround.data.repository
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
 import com.csci571.hw4.eventsaround.data.remote.RetrofitClient
-import com.csci571.hw4.eventsaround.data.model.SearchParams
-import com.csci571.hw4.eventsaround.data.model.EventDetails
-import com.csci571.hw4.eventsaround.data.model.Event
-import android.util.Log
+import com.csci571.hw4.eventsaround.data.model.*
 
-class EventRepository {
+/**
+ * Repository for event-related API operations
+ * Singleton pattern to ensure single instance across app
+ */
+class EventRepository private constructor() {
 
     private val apiService = RetrofitClient.getApiService()
     private val TAG = "EventRepository"
 
+    /**
+     * Search for events based on search parameters
+     */
     suspend fun searchEvents(params: SearchParams): Result<List<Event>> {
         return withContext(Dispatchers.IO) {
             try {
@@ -43,13 +47,19 @@ class EventRepository {
         }
     }
 
+    /**
+     * Get detailed information for a specific event
+     */
     suspend fun getEventDetails(eventId: String): Result<EventDetails> {
         return withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "Fetching details for event: $eventId")
+
                 val response = apiService.getEventDetails(eventId)
 
                 if (response.isSuccessful) {
                     response.body()?.let {
+                        Log.d(TAG, "Event details fetched successfully")
                         Result.success(it)
                     } ?: Result.failure(Exception("Event details not found"))
                 } else {
@@ -64,6 +74,9 @@ class EventRepository {
         }
     }
 
+    /**
+     * Get autocomplete suggestions for keyword search
+     */
     suspend fun getAutocompleteSuggestions(keyword: String): Result<List<String>> {
         return withContext(Dispatchers.IO) {
             try {
@@ -71,17 +84,105 @@ class EventRepository {
                     return@withContext Result.success(emptyList())
                 }
 
+                Log.d(TAG, "Fetching autocomplete for: $keyword")
+
                 val response = apiService.getAutocompleteSuggestions(keyword)
 
                 if (response.isSuccessful) {
                     val suggestions = response.body()?.suggestions ?: emptyList()
+                    Log.d(TAG, "Autocomplete: Found ${suggestions.size} suggestions")
                     Result.success(suggestions)
                 } else {
-                    Result.success(emptyList())
+                    Result.failure(
+                        Exception("API Error: ${response.code()}")
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Autocomplete error", e)
-                Result.success(emptyList())
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Search for artist on Spotify
+     */
+    suspend fun searchSpotifyArtist(artistName: String): Result<SpotifyArtist> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Searching Spotify for artist: $artistName")
+
+                val response = apiService.searchSpotifyArtist(artistName)
+
+                if (response.isSuccessful) {
+                    response.body()?.let { searchResponse ->
+                        Log.d(TAG, "Artist found on Spotify")
+                        // Extract artist from the response wrapper
+                        Result.success(searchResponse.artist)
+                    } ?: Result.failure(Exception("Artist not found"))
+                } else {
+                    Result.failure(
+                        Exception("Spotify API Error: ${response.code()}")
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Spotify artist search error", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Get artist albums from Spotify
+     */
+    suspend fun getArtistAlbums(artistId: String): Result<List<Album>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching albums for artist: $artistId")
+
+                val response = apiService.getArtistAlbums(artistId)
+
+                if (response.isSuccessful) {
+                    response.body()?.let { albumsResponse ->
+                        val albums = albumsResponse.albums
+                        Log.d(TAG, "Found ${albums.size} albums")
+                        Result.success(albums)
+                    } ?: Result.failure(Exception("Albums not found"))
+                } else {
+                    Result.failure(
+                        Exception("Spotify API Error: ${response.code()}")
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Albums fetch error", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Get venue details from Google Places
+     */
+    suspend fun getVenueDetails(venueName: String): Result<VenueDetails> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching venue details: $venueName")
+
+                val response = apiService.getVenueDetails(venueName)
+
+                if (response.isSuccessful) {
+                    response.body()?.let {
+                        Log.d(TAG, "Venue details fetched")
+                        Result.success(it)
+                    } ?: Result.failure(Exception("Venue not found"))
+                } else {
+                    Result.failure(
+                        Exception("API Error: ${response.code()}")
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Venue details error", e)
+                Result.failure(e)
             }
         }
     }
@@ -90,6 +191,9 @@ class EventRepository {
         @Volatile
         private var instance: EventRepository? = null
 
+        /**
+         * Get singleton instance of EventRepository
+         */
         fun getInstance(): EventRepository {
             return instance ?: synchronized(this) {
                 instance ?: EventRepository().also { instance = it }
