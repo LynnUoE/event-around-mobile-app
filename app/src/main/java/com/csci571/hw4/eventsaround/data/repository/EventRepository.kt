@@ -108,6 +108,7 @@ class EventRepository private constructor() {
 
     /**
      * Search for artist on Spotify
+     * Backend returns the artist object directly, not a search response
      */
     suspend fun searchSpotifyArtist(artistName: String): Result<SpotifyArtist?> {
         return withContext(Dispatchers.IO) {
@@ -117,17 +118,18 @@ class EventRepository private constructor() {
                 val response = apiService.searchSpotifyArtist(artistName)
 
                 if (response.isSuccessful) {
-                    response.body()?.let { searchResponse ->
-                        // Get the first artist from the results
-                        val artist = searchResponse.artists?.items?.firstOrNull()
-                        if (artist != null) {
-                            Log.d(TAG, "Artist found on Spotify: ${artist.name}")
-                            Result.success(artist)
-                        } else {
-                            Log.d(TAG, "No artist found on Spotify")
-                            Result.success(null)
-                        }
-                    } ?: Result.success(null)
+                    val artist = response.body()
+                    if (artist != null) {
+                        Log.d(TAG, "Artist found on Spotify: ${artist.name}")
+                        Result.success(artist)
+                    } else {
+                        Log.d(TAG, "No artist found on Spotify")
+                        Result.success(null)
+                    }
+                } else if (response.code() == 404) {
+                    // Artist not found - this is not an error
+                    Log.d(TAG, "Artist not found on Spotify (404)")
+                    Result.success(null)
                 } else {
                     Result.failure(
                         Exception("Spotify API Error: ${response.code()}")
@@ -157,6 +159,7 @@ class EventRepository private constructor() {
                         Result.success(albums)
                     } ?: Result.failure(Exception("Albums not found"))
                 } else {
+                    Log.e(TAG, "Failed to fetch albums: ${response.code()}")
                     Result.failure(
                         Exception("Spotify API Error: ${response.code()}")
                     )

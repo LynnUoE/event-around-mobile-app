@@ -1,7 +1,6 @@
 package com.csci571.hw4.eventsaround.ui.screens
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -20,7 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.csci571.hw4.eventsaround.data.model.EventDetails
+import com.csci571.hw4.eventsaround.ui.viewmodel.EventDetailsViewModel
 
 /**
  * Details Screen - Shows comprehensive information about a single event
@@ -30,25 +32,27 @@ import coil.compose.AsyncImage
 @Composable
 fun DetailsScreen(
     eventId: String,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    viewModel: EventDetailsViewModel = viewModel()
 ) {
     val context = LocalContext.current
     var selectedTab by remember { mutableStateOf(0) }
-    var isFavorite by remember { mutableStateOf(false) }
-    val isLoading by remember { mutableStateOf(false) }
 
-    // Use var instead of val for mutable state
-    var eventDetails by remember { mutableStateOf<EventDetails?>(null) }
+    // Collect states from ViewModel
+    val eventDetails by viewModel.eventDetails.collectAsState()
+    val isFavorite by viewModel.isFavorite.collectAsState()
+    val isLoading by viewModel.isLoadingDetails.collectAsState()
+    val error by viewModel.error.collectAsState()
 
+    // Load event details when screen opens
     LaunchedEffect(eventId) {
-        // TODO: Fetch event details from API
-        // eventDetails = repository.getEventDetails(eventId)
+        viewModel.loadEventDetails(eventId)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Event Details") },
+                title = { Text(eventDetails?.name ?: "Event Details") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -58,109 +62,130 @@ fun DetailsScreen(
                     }
                 },
                 actions = {
-                    // Share button
-                    IconButton(
-                        onClick = {
-                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                type = "text/plain"
-                                putExtra(Intent.EXTRA_TEXT, "Check out this event: ${eventDetails?.name ?: "Unknown Event"}")
-                            }
-                            context.startActivity(Intent.createChooser(shareIntent, "Share event"))
-                        }
-                    ) {
-                        Icon(Icons.Default.Share, "Share")
-                    }
-
                     // Favorite button
                     IconButton(
-                        onClick = {
-                            isFavorite = !isFavorite
-                            // TODO: Toggle favorite in repository
-                        }
+                        onClick = { viewModel.toggleFavorite() },
+                        enabled = eventDetails != null
                     ) {
                         Icon(
                             imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                             contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                            tint = if (isFavorite) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = if (isFavorite) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    // Share button
+                    IconButton(
+                        onClick = {
+                            val shareText = eventDetails?.let { event ->
+                                "Check out this event: ${event.name}\n${event.url ?: ""}"
+                            } ?: "Check out this event!"
+
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Event"))
+                        },
+                        enabled = eventDetails != null
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share"
                         )
                     }
                 }
             )
         }
     ) { paddingValues ->
-        if (isLoading) {
-            // Loading state
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            // Create local variable for smart cast
-            val currentEventDetails = eventDetails
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when {
+                isLoading -> {
+                    // Show loading indicator
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
 
-            if (currentEventDetails == null) {
-                // Empty/Error state
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center
-                ) {
+                error != null -> {
+                    // Show error message
                     Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Event not found")
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("ID: $eventId", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = error ?: "Unknown error",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = {
+                            viewModel.clearError()
+                            viewModel.loadEventDetails(eventId)
+                        }) {
+                            Text("Retry")
+                        }
                     }
                 }
-            } else {
-                // Content state
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    // Event image
-                    AsyncImage(
-                        model = currentEventDetails.imageUrl,
-                        contentDescription = currentEventDetails.name,
+
+                eventDetails != null -> {
+                    // Show event details
+                    val currentEventDetails = eventDetails!!
+
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .height(250.dp),
-                        contentScale = ContentScale.Crop
+                            .fillMaxSize()
+                    ) {
+                        // Event image
+                        AsyncImage(
+                            model = currentEventDetails.images?.firstOrNull()?.url ?: "",
+                            contentDescription = currentEventDetails.name,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(250.dp),
+                            contentScale = ContentScale.Crop
+                        )
+
+                        // Tabs
+                        TabRow(selectedTabIndex = selectedTab) {
+                            Tab(
+                                selected = selectedTab == 0,
+                                onClick = { selectedTab = 0 },
+                                text = { Text("Details") }
+                            )
+                            Tab(
+                                selected = selectedTab == 1,
+                                onClick = { selectedTab = 1 },
+                                text = { Text("Artist") }
+                            )
+                            Tab(
+                                selected = selectedTab == 2,
+                                onClick = { selectedTab = 2 },
+                                text = { Text("Venue") }
+                            )
+                        }
+
+                        // Tab content
+                        when (selectedTab) {
+                            0 -> DetailsTab(currentEventDetails)
+                            1 -> ArtistTab(currentEventDetails, viewModel)
+                            2 -> VenueTab(currentEventDetails)
+                        }
+                    }
+                }
+
+                else -> {
+                    // Fallback - should not happen
+                    Text(
+                        text = "No event data available",
+                        modifier = Modifier.align(Alignment.Center)
                     )
-
-                    // Tabs
-                    TabRow(selectedTabIndex = selectedTab) {
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            text = { Text("Details") }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            text = { Text("Artist") }
-                        )
-                        Tab(
-                            selected = selectedTab == 2,
-                            onClick = { selectedTab = 2 },
-                            text = { Text("Venue") }
-                        )
-                    }
-
-                    // Tab content
-                    when (selectedTab) {
-                        0 -> DetailsTab(currentEventDetails)
-                        1 -> ArtistTab(currentEventDetails)
-                        2 -> VenueTab(currentEventDetails)
-                    }
                 }
             }
         }
@@ -187,95 +212,154 @@ fun DetailsTab(event: EventDetails) {
         )
 
         // Date and time
-        DetailRow("Date", event.date)
-        DetailRow("Time", event.time)
+        event.dates?.start?.let { start ->
+            DetailRow("Date", start.localDate ?: "TBA")
+            DetailRow("Time", start.localTime ?: "TBA")
+        }
 
         // Venue
-        DetailRow("Venue", event.venueName)
-
-        // Genre/Category
-        if (event.genres.isNotEmpty()) {
-            DetailRow("Genres", event.genres.joinToString(", "))
+        event._embedded?.venues?.firstOrNull()?.let { venue ->
+            DetailRow("Venue", venue.name)
         }
 
-        // Price range
-        if (event.priceRange.isNotEmpty()) {
-            DetailRow("Price Range", event.priceRange)
-        }
-
-        // Ticket status
-        DetailRow("Ticket Status", event.ticketStatus)
-
-        // Buy tickets button
-        if (event.buyTicketUrl.isNotEmpty()) {
-            val context = LocalContext.current
-            Button(
-                onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(event.buyTicketUrl))
-                    context.startActivity(intent)
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("BUY TICKETS")
+        // Category/Genre
+        event.classifications?.firstOrNull()?.let { classification ->
+            classification.segment?.name?.let { segment ->
+                DetailRow("Category", segment)
+            }
+            classification.genre?.name?.let { genre ->
+                DetailRow("Genre", genre)
             }
         }
 
-        // Seat map (if available)
-        if (event.seatmapUrl.isNotEmpty()) {
+        // Price range
+        event.priceRanges?.firstOrNull()?.let { priceRange ->
+            val priceText = when {
+                priceRange.min != null && priceRange.max != null ->
+                    "$${priceRange.min} - $${priceRange.max}"
+                priceRange.min != null -> "From $${priceRange.min}"
+                else -> "Check website"
+            }
+            DetailRow("Price Range", priceText)
+        }
+
+        // Ticket status
+        event.dates?.status?.code?.let { status ->
+            DetailRow("Status", status.uppercase())
+        }
+
+        // Seatmap
+        event.seatmap?.staticUrl?.let { seatmapUrl ->
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Seat Map",
+                text = "Seatmap",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             AsyncImage(
-                model = event.seatmapUrl,
-                contentDescription = "Seat map",
+                model = seatmapUrl,
+                contentDescription = "Seatmap",
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp),
                 contentScale = ContentScale.Fit
             )
         }
-    }
-}
 
-/**
- * Artist tab content showing artist/team information
- */
-@Composable
-fun ArtistTab(event: EventDetails) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        if (event.artists.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        // Buy tickets button
+        event.url?.let { url ->
+            Button(
+                onClick = {
+                    // Open URL in browser
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "No artist information available",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        } else {
-            event.artists.forEach { artist ->
-                ArtistCard(artist)
+                Text("Buy Tickets")
             }
         }
     }
 }
 
 /**
- * Venue tab content showing venue information and map
+ * Artist tab content
+ */
+@Composable
+fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
+    val artistData by viewModel.artistData.collectAsState()
+    val albums by viewModel.albums.collectAsState()
+    val isLoadingArtist by viewModel.isLoadingArtist.collectAsState()
+
+    // Load artist data when tab opens
+    LaunchedEffect(Unit) {
+        event._embedded?.attractions?.firstOrNull()?.let { attraction ->
+            viewModel.loadArtistData(attraction.name)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        when {
+            isLoadingArtist -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+
+            artistData != null -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Artist info
+                    Text(
+                        text = artistData!!.name,
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    artistData!!.followers?.total?.let { followers ->
+                        Text("Followers: ${formatFollowers(followers)}")
+                    }
+
+                    artistData!!.popularity?.let { popularity ->
+                        Text("Popularity: $popularity%")
+                    }
+
+                    // Albums
+                    if (albums.isNotEmpty()) {
+                        Text(
+                            text = "Albums",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        albums.forEach { album ->
+                            AlbumCard(album)
+                        }
+                    }
+                }
+            }
+
+            else -> {
+                Text(
+                    text = "No artist data available",
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Venue tab content
  */
 @Composable
 fun VenueTab(event: EventDetails) {
-    val context = LocalContext.current
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -283,49 +367,47 @@ fun VenueTab(event: EventDetails) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Venue name
-        Text(
-            text = event.venueName,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
+        event._embedded?.venues?.firstOrNull()?.let { venue ->
+            Text(
+                text = venue.name,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
 
-        // Address
-        if (event.venueAddress.isNotEmpty()) {
-            DetailRow("Address", event.venueAddress)
+            // Address
+            venue.address?.line1?.let { address ->
+                DetailRow("Address", address)
+            }
+
+            // City and State
+            val location = buildString {
+                venue.city?.name?.let { append(it) }
+                venue.state?.stateCode?.let {
+                    if (isNotEmpty()) append(", ")
+                    append(it)
+                }
+            }
+            if (location.isNotEmpty()) {
+                DetailRow("Location", location)
+            }
+
+            // Coordinates
+            venue.location?.let { loc ->
+                if (loc.latitude.isNotEmpty() && loc.longitude.isNotEmpty()) {
+                    DetailRow("Coordinates", "${loc.latitude}, ${loc.longitude}")
+                }
+            }
+        } ?: run {
+            Text(
+                text = "No venue information available",
+                modifier = Modifier.padding(16.dp)
+            )
         }
-
-        // City, State
-        DetailRow("Location", "${event.venueCity}, ${event.venueState}")
-
-        // Phone number (if available)
-        if (event.venuePhone.isNotEmpty()) {
-            DetailRow("Phone", event.venuePhone)
-        }
-
-        // Open hours (if available)
-        if (event.venueOpenHours.isNotEmpty()) {
-            DetailRow("Hours", event.venueOpenHours)
-        }
-
-        // Google Maps button
-        Button(
-            onClick = {
-                val mapUri = "geo:0,0?q=${event.venueAddress}, ${event.venueCity}, ${event.venueState}"
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(mapUri))
-                context.startActivity(intent)
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("OPEN IN MAPS")
-        }
-
-        // TODO: Add Google Maps embed
     }
 }
 
 /**
- * Reusable detail row component
+ * Helper composable for detail rows
  */
 @Composable
 fun DetailRow(label: String, value: String) {
@@ -343,101 +425,45 @@ fun DetailRow(label: String, value: String) {
 }
 
 /**
- * Artist card component
+ * Album card composable
  */
 @Composable
-fun ArtistCard(artist: ArtistInfo) {
-    val context = LocalContext.current
-
+fun AlbumCard(album: com.csci571.hw4.eventsaround.data.model.Album) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Artist image
-            if (artist.imageUrl.isNotEmpty()) {
-                AsyncImage(
-                    model = artist.imageUrl,
-                    contentDescription = artist.name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            // Artist name
-            Text(
-                text = artist.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+            AsyncImage(
+                model = album.images?.firstOrNull()?.url ?: "",
+                contentDescription = album.name,
+                modifier = Modifier.size(60.dp)
             )
-
-            // Followers count (Spotify)
-            if (artist.followers > 0) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
                 Text(
-                    text = "${artist.followers} followers",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = album.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
                 )
-            }
-
-            // Popularity
-            if (artist.popularity > 0) {
                 Text(
-                    text = "Popularity: ${artist.popularity}",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = album.release_date ?: "Unknown",
+                    style = MaterialTheme.typography.bodySmall
                 )
-            }
-
-            // Spotify link
-            if (artist.spotifyUrl.isNotEmpty()) {
-                TextButton(
-                    onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(artist.spotifyUrl))
-                        context.startActivity(intent)
-                    }
-                ) {
-                    Text("View on Spotify")
-                }
             }
         }
     }
 }
 
 /**
- * Data classes for event details
- * TODO: Move to data/model package
+ * Format followers count (e.g., 1.2M, 345K)
  */
-data class EventDetails(
-    val id: String,
-    val name: String,
-    val date: String,
-    val time: String,
-    val venueName: String,
-    val venueAddress: String,
-    val venueCity: String,
-    val venueState: String,
-    val venuePhone: String = "",
-    val venueOpenHours: String = "",
-    val genres: List<String> = emptyList(),
-    val priceRange: String = "",
-    val ticketStatus: String = "",
-    val buyTicketUrl: String = "",
-    val seatmapUrl: String = "",
-    val imageUrl: String = "",
-    val artists: List<ArtistInfo> = emptyList()
-)
-
-data class ArtistInfo(
-    val name: String,
-    val imageUrl: String = "",
-    val followers: Int = 0,
-    val popularity: Int = 0,
-    val spotifyUrl: String = ""
-)
+fun formatFollowers(count: Int): String {
+    return when {
+        count >= 1_000_000 -> String.format("%.1fM", count / 1_000_000.0)
+        count >= 1_000 -> String.format("%.1fK", count / 1_000.0)
+        else -> count.toString()
+    }
+}

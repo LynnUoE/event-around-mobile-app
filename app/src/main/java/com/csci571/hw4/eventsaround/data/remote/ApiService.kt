@@ -6,8 +6,6 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.QueryMap
 import com.csci571.hw4.eventsaround.data.model.*
-import com.csci571.hw4.eventsaround.data.repository.*
-
 
 /**
  * Retrofit API Service Interface
@@ -37,35 +35,37 @@ interface ApiService {
      * Get autocomplete suggestions for keyword search
      * @param keyword Search keyword
      */
-    @GET("api/autocomplete")
+    @GET("api/events/suggest")
     suspend fun getAutocompleteSuggestions(
         @Query("keyword") keyword: String
     ): Response<AutocompleteResponse>
 
     /**
      * Search for artist on Spotify
-     * @param artistName Name of the artist to search
+     * Backend endpoint: GET /api/artists/search?keyword=xxx
+     * @param keyword Artist name to search
      */
-    @GET("api/spotify/artist")
+    @GET("api/artists/search")
     suspend fun searchSpotifyArtist(
-        @Query("name") artistName: String
-    ): Response<SpotifyArtistSearchResponse>
+        @Query("keyword") keyword: String
+    ): Response<SpotifyArtist>
 
     /**
      * Get albums for a specific artist from Spotify
+     * Backend endpoint: GET /api/artists/:id/albums
      * @param artistId Spotify artist ID
      */
-    @GET("api/spotify/artist/{artistId}/albums")
+    @GET("api/artists/{artistId}/albums")
     suspend fun getArtistAlbums(
         @Path("artistId") artistId: String
     ): Response<SpotifyAlbumsResponse>
 
     /**
-     * Get venue details from Google Places API
+     * Get venue details from Ticketmaster
      * @param venueName Name of the venue
      */
-    @GET("api/venue/details")
+    @GET("api/events/venue/{venueName}")
     suspend fun getVenueDetails(
-        @Query("name") venueName: String
+        @Path("venueName") venueName: String
     ): Response<VenueDetails>
 }
