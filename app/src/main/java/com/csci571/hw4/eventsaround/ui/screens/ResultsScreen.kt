@@ -19,7 +19,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.csci571.hw4.eventsaround.data.model.Event
@@ -28,8 +27,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Results Screen - Displays search results in a scrollable list
- * Shows event cards with name, venue, date/time, image, and favorite button
+ * Results Screen - Displays search results
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +52,10 @@ fun ResultsScreen(
                             contentDescription = "Back"
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFE3F2FD)
+                )
             )
         }
     ) { paddingValues ->
@@ -65,14 +66,12 @@ fun ResultsScreen(
         ) {
             when {
                 isLoading -> {
-                    // Show loading indicator while fetching results
                     CircularProgressIndicator(
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
 
                 error != null -> {
-                    // Show error message
                     Column(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -80,7 +79,7 @@ fun ResultsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Error: ${error}",
+                            text = "Error: $error",
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center
                         )
@@ -92,13 +91,12 @@ fun ResultsScreen(
                 }
 
                 searchResults.isEmpty() -> {
-                    // Show "No events found" message when results list is empty
                     Card(
                         modifier = Modifier
                             .align(Alignment.Center)
                             .padding(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = Color(0xFFE3F2FD)
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -112,7 +110,6 @@ fun ResultsScreen(
                 }
 
                 else -> {
-                    // Display search results in a scrollable list
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
@@ -131,10 +128,6 @@ fun ResultsScreen(
     }
 }
 
-/**
- * Event card component for search results
- * Uses Event model's helper properties for easy access
- */
 @Composable
 fun EventResultCard(
     event: Event,
@@ -153,7 +146,6 @@ fun EventResultCard(
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            // Event image - using helper property
             AsyncImage(
                 model = event.imageUrl,
                 contentDescription = "Event image",
@@ -165,14 +157,12 @@ fun EventResultCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Event details
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // Event name - direct property
                 Text(
                     text = event.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -182,7 +172,6 @@ fun EventResultCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Venue name - using helper property
                 Text(
                     text = event.venue.ifEmpty { "Venue TBA" },
                     style = MaterialTheme.typography.bodyMedium,
@@ -193,7 +182,6 @@ fun EventResultCard(
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Date and time - using helper properties
                 Text(
                     text = formatDateTime(event.date, event.time),
                     style = MaterialTheme.typography.bodySmall,
@@ -202,7 +190,6 @@ fun EventResultCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Category badge - using helper property
                 if (event.category.isNotEmpty()) {
                     Surface(
                         color = getCategoryColor(event.category),
@@ -219,61 +206,45 @@ fun EventResultCard(
                 }
             }
 
-            // Favorite button
-            IconButton(
-                onClick = {
-                    isFavorite = !isFavorite
-                    // TODO: Add to favorites using repository
-                }
-            ) {
+            IconButton(onClick = { isFavorite = !isFavorite }) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                     contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFavorite) Color(0xFFFFD700) else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (isFavorite) Color(0xFFFFD700) else Color.Gray
                 )
             }
         }
     }
 }
 
-/**
- * Get color for category badge based on category name
- */
-@Composable
-fun getCategoryColor(category: String): Color {
-    return when (category.lowercase()) {
-        "music" -> Color(0xFF1DB954)        // Green
-        "sports" -> Color(0xFF0066CC)       // Blue
-        "arts & theatre", "arts" -> Color(0xFF9C27B0)  // Purple
-        "film" -> Color(0xFFE91E63)         // Pink
-        "miscellaneous" -> Color(0xFF607D8B)   // Blue Grey
-        else -> Color(0xFF757575)           // Grey
+private fun formatDateTime(dateString: String, timeString: String?): String {
+    return try {
+        val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val date = inputDateFormat.parse(dateString)
+        val outputDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
+        val formattedDate = date?.let { outputDateFormat.format(it) } ?: dateString
+
+        if (!timeString.isNullOrEmpty()) {
+            val inputTimeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
+            val time = inputTimeFormat.parse(timeString)
+            val outputTimeFormat = SimpleDateFormat("h:mm a", Locale.US)
+            val formattedTime = time?.let { outputTimeFormat.format(it) } ?: timeString
+            "$formattedDate, $formattedTime"
+        } else {
+            formattedDate
+        }
+    } catch (e: Exception) {
+        "$dateString ${timeString ?: ""}"
     }
 }
 
-/**
- * Format date and time for display
- * Converts to "MMM dd, yyyy, h:mm a" format
- */
-fun formatDateTime(date: String, time: String): String {
-    return try {
-        if (date.isEmpty()) return "Date TBA"
-
-        val dateStr = if (time.isNotEmpty()) {
-            // Combine date and time
-            val inputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-            val outputFormat = SimpleDateFormat("MMM dd, yyyy, h:mm a", Locale.US)
-            val parsedDate = inputFormat.parse("$date $time")
-            outputFormat.format(parsedDate ?: Date())
-        } else {
-            // Date only
-            val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            val outputFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
-            val parsedDate = inputFormat.parse(date)
-            outputFormat.format(parsedDate ?: Date())
-        }
-        dateStr
-    } catch (e: Exception) {
-        "Date TBA"
+private fun getCategoryColor(category: String): Color {
+    return when (category.lowercase()) {
+        "music" -> Color(0xFF9C27B0)
+        "sports" -> Color(0xFF4CAF50)
+        "arts & theatre", "arts" -> Color(0xFFFF5722)
+        "film" -> Color(0xFF2196F3)
+        "miscellaneous" -> Color(0xFF607D8B)
+        else -> Color.Gray
     }
 }

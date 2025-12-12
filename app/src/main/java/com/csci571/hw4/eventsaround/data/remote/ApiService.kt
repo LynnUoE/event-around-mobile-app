@@ -33,12 +33,32 @@ interface ApiService {
 
     /**
      * Get autocomplete suggestions for keyword search
+     * Uses Ticketmaster suggest endpoint
      * @param keyword Search keyword
      */
     @GET("api/events/suggest")
     suspend fun getAutocompleteSuggestions(
         @Query("keyword") keyword: String
     ): Response<AutocompleteResponse>
+
+    /**
+     * Get current location based on IP address
+     * Uses IPInfo service via backend
+     * Backend endpoint: GET /api/location
+     */
+    @GET("api/location")
+    suspend fun getCurrentLocation(): Response<LocationResponse>
+
+    /**
+     * Geocode a location string to coordinates
+     * Uses Google Geocoding API via backend
+     * Backend endpoint: GET /api/geocode?address=xxx
+     * @param address Location string to geocode
+     */
+    @GET("api/geocode")
+    suspend fun geocodeLocation(
+        @Query("address") address: String
+    ): Response<GeocodeResponse>
 
     /**
      * Search for artist on Spotify
@@ -69,3 +89,23 @@ interface ApiService {
         @Path("venueName") venueName: String
     ): Response<VenueDetails>
 }
+
+/**
+ * Location response from IPInfo service
+ */
+data class LocationResponse(
+    val lat: Double,
+    val lng: Double,
+    val city: String? = null,
+    val region: String? = null,
+    val country: String? = null
+)
+
+/**
+ * Geocoding response from Google Geocoding API
+ */
+data class GeocodeResponse(
+    val lat: Double,
+    val lng: Double,
+    val formatted_address: String? = null
+)

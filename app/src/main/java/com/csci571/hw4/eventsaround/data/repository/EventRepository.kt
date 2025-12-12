@@ -1,44 +1,61 @@
 package com.csci571.hw4.eventsaround.data.repository
 
 import android.util.Log
+import com.csci571.hw4.eventsaround.data.model.*
+import com.csci571.hw4.eventsaround.data.remote.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import com.csci571.hw4.eventsaround.data.remote.RetrofitClient
-import com.csci571.hw4.eventsaround.data.model.*
 
 /**
- * Repository for event-related API operations
+ * EventRepository - Handles all event-related data operations
  * Singleton pattern to ensure single instance across app
+ * Communicates with backend API for:
+ * - Event search
+ * - Event details
+ * - Autocomplete suggestions
+ * - Location services (geocoding, IP-based location)
+ * - Spotify artist/album data
+ * - Venue details
  */
 class EventRepository private constructor() {
 
-    private val apiService = RetrofitClient.getApiService()
     private val TAG = "EventRepository"
+    private val apiService = RetrofitClient.getApiService()
+
+    companion object {
+        @Volatile
+        private var instance: EventRepository? = null
+
+        /**
+         * Get singleton instance of EventRepository
+         */
+        fun getInstance(): EventRepository {
+            return instance ?: synchronized(this) {
+                instance ?: EventRepository().also {
+                    instance = it
+                }
+            }
+        }
+    }
 
     /**
-     * Search for events based on search parameters
+     * Search for events with given parameters
      */
     suspend fun searchEvents(params: SearchParams): Result<List<Event>> {
         return withContext(Dispatchers.IO) {
             try {
-                if (!params.isValid()) {
-                    return@withContext Result.failure(
-                        IllegalArgumentException("Invalid search parameters")
-                    )
-                }
-
-                Log.d(TAG, "Searching with params: ${params.toQueryMap()}")
+                Log.d(TAG, "Searching events: ${params.keyword}")
 
                 val response = apiService.searchEvents(params.toQueryMap())
 
                 if (response.isSuccessful) {
                     val events = response.body()?.embedded?.events ?: emptyList()
-                    Log.d(TAG, "Search successful: Found ${events.size} events")
+                    Log.d(TAG, "Found ${events.size} events")
                     Result.success(events)
                 } else {
-                    val error = "API Error: ${response.code()} ${response.message()}"
-                    Log.e(TAG, error)
-                    Result.failure(Exception(error))
+                    Result.failure(
+                        Exception("API Error: ${response.code()} ${response.message()}")
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Search error", e)
@@ -53,15 +70,14 @@ class EventRepository private constructor() {
     suspend fun getEventDetails(eventId: String): Result<EventDetails> {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "Fetching details for event: $eventId")
+                Log.d(TAG, "Fetching event details: $eventId")
 
                 val response = apiService.getEventDetails(eventId)
 
-                if (response.isSuccessful) {
-                    response.body()?.let {
-                        Log.d(TAG, "Event details fetched successfully")
-                        Result.success(it)
-                    } ?: Result.failure(Exception("Event details not found"))
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else if (response.code() == 404) {
+                    Result.failure(Exception("Event details not found"))
                 } else {
                     Result.failure(
                         Exception("API Error: ${response.code()} ${response.message()}")
@@ -76,6 +92,7 @@ class EventRepository private constructor() {
 
     /**
      * Get autocomplete suggestions for keyword search
+     * Returns list of suggestion strings
      */
     suspend fun getAutocompleteSuggestions(keyword: String): Result<List<String>> {
         return withContext(Dispatchers.IO) {
@@ -101,6 +118,67 @@ class EventRepository private constructor() {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Autocomplete error", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Get current location based on IP address
+     * Uses IPInfo service via backend
+     */
+    suspend fun getCurrentLocation(): Result<Pair<Double, Double>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Getting current location via IP")
+
+                val response = apiService.getCurrentLocation()
+
+                if (response.isSuccessful && response.body() != null) {
+                    val location = response.body()!!
+                    Log.d(TAG, "Location detected: (${location.lat}, ${location.lng})")
+                    Result.success(Pair(location.lat, location.lng))
+                } else {
+                    Log.w(TAG, "Location API failed, using default")
+                    // Return default LA coordinates
+                    Result.success(Pair(
+                        SearchParams.DEFAULT_LAT,
+                        SearchParams.DEFAULT_LNG
+                    ))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Location error, using default", e)
+                // Return default LA coordinates on error
+                Result.success(Pair(
+                    SearchParams.DEFAULT_LAT,
+                    SearchParams.DEFAULT_LNG
+                ))
+            }
+        }
+    }
+
+    /**
+     * Geocode a location string to coordinates
+     * Uses Google Geocoding API via backend
+     */
+    suspend fun geocodeLocation(address: String): Result<Pair<Double, Double>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Geocoding address: $address")
+
+                val response = apiService.geocodeLocation(address)
+
+                if (response.isSuccessful && response.body() != null) {
+                    val geocode = response.body()!!
+                    Log.d(TAG, "Geocoded to: (${geocode.lat}, ${geocode.lng})")
+                    Result.success(Pair(geocode.lat, geocode.lng))
+                } else {
+                    Result.failure(
+                        Exception("Unable to geocode location: ${response.message()}")
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Geocoding error", e)
                 Result.failure(e)
             }
         }
@@ -157,9 +235,10 @@ class EventRepository private constructor() {
                         val albums = albumsResponse.items
                         Log.d(TAG, "Found ${albums.size} albums")
                         Result.success(albums)
-                    } ?: Result.failure(Exception("Albums not found"))
+                    } ?: Result.success(emptyList())
+                } else if (response.code() == 404) {
+                    Result.success(emptyList())
                 } else {
-                    Log.e(TAG, "Failed to fetch albums: ${response.code()}")
                     Result.failure(
                         Exception("Spotify API Error: ${response.code()}")
                     )
@@ -172,8 +251,7 @@ class EventRepository private constructor() {
     }
 
     /**
-     * Get venue details (if your backend provides this)
-     * This is optional - Google Maps doesn't need extra venue details
+     * Get venue details
      */
     suspend fun getVenueDetails(venueName: String): Result<VenueDetails?> {
         return withContext(Dispatchers.IO) {
@@ -183,51 +261,17 @@ class EventRepository private constructor() {
                 val response = apiService.getVenueDetails(venueName)
 
                 if (response.isSuccessful) {
-                    response.body()?.let {
-                        Log.d(TAG, "Venue details fetched")
-                        Result.success(it)
-                    } ?: Result.success(null)
-                } else {
-                    // Don't fail - venue details are optional
-                    Log.w(TAG, "Venue details not available: ${response.code()}")
+                    Result.success(response.body())
+                } else if (response.code() == 404) {
                     Result.success(null)
+                } else {
+                    Result.failure(
+                        Exception("Venue API Error: ${response.code()}")
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Venue details error", e)
-                // Don't fail - just return null
-                Result.success(null)
-            }
-        }
-    }
-
-    /**
-     * Get current location from IP (fallback method)
-     */
-    suspend fun getCurrentLocationFromIP(): Result<IPLocation?> {
-        return withContext(Dispatchers.IO) {
-            try {
-                Log.d(TAG, "Getting location from IP")
-
-                // If your backend has an IPInfo endpoint, use it
-                // Otherwise return null and use device location
-                Result.success(null)
-            } catch (e: Exception) {
-                Log.e(TAG, "IP location error", e)
-                Result.success(null)
-            }
-        }
-    }
-
-    companion object {
-        @Volatile
-        private var instance: EventRepository? = null
-
-        /**
-         * Get singleton instance of EventRepository
-         */
-        fun getInstance(): EventRepository {
-            return instance ?: synchronized(this) {
-                instance ?: EventRepository().also { instance = it }
+                Result.failure(e)
             }
         }
     }

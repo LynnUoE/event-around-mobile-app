@@ -1,8 +1,10 @@
 package com.csci571.hw4.eventsaround.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.csci571.hw4.eventsaround.data.local.PreferencesManager
 import com.csci571.hw4.eventsaround.data.model.Event
 import com.csci571.hw4.eventsaround.data.model.SearchParams
 import com.csci571.hw4.eventsaround.data.repository.EventRepository
@@ -17,7 +19,9 @@ import kotlinx.coroutines.launch
  */
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val TAG = "SearchViewModel"
     private val repository = EventRepository.getInstance()
+    private val preferencesManager = PreferencesManager(application)
 
     // Search results state
     private val _searchResults = MutableStateFlow<List<Event>>(emptyList())
@@ -48,18 +52,48 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 _error.value = null
                 lastSearchParams = params
 
-                val result = repository.searchEvents(params)
+                Log.d(TAG, "Starting search with params: $params")
+
+                // Get coordinates
+                val (lat, lng) = if (params.autoDetect) {
+                    Log.d(TAG, "Using auto-detect location")
+                    getCurrentLocation()
+                } else if (params.location.isNotBlank()) {
+                    Log.d(TAG, "Geocoding manual location: ${params.location}")
+                    geocodeLocation(params.location)
+                } else {
+                    Log.d(TAG, "Using default LA coordinates")
+                    Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG)
+                }
+
+                // Update params with coordinates
+                val searchParamsWithCoords = params.copy(
+                    latitude = lat,
+                    longitude = lng
+                )
+
+                Log.d(TAG, "Searching events at: ($lat, $lng)")
+
+                // Perform search
+                val result = repository.searchEvents(searchParamsWithCoords)
 
                 if (result.isSuccess) {
-                    _searchResults.value = result.getOrNull() ?: emptyList()
+                    val events = result.getOrNull() ?: emptyList()
+                    _searchResults.value = events
+                    Log.d(TAG, "Search successful: ${events.size} events found")
+
+                    // Save search params and history
+                    preferencesManager.saveLastSearchParams(params)
+                    preferencesManager.saveSearchHistory(params.keyword)
                 } else {
-                    _error.value = result.exceptionOrNull()?.message
-                        ?: "Failed to search events"
+                    _error.value = result.exceptionOrNull()?.message ?: "Failed to search events"
                     _searchResults.value = emptyList()
+                    Log.e(TAG, "Search failed: ${_error.value}")
                 }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Unknown error occurred"
                 _searchResults.value = emptyList()
+                Log.e(TAG, "Search error", e)
             } finally {
                 _isLoading.value = false
             }
@@ -68,6 +102,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Get autocomplete suggestions
+     * PUBLIC method - can be called from SearchScreen
      */
     fun getAutocompleteSuggestions(keyword: String) {
         if (keyword.length < 2) {
@@ -91,11 +126,38 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
+     * Get current location using IP-based geolocation
+     */
+    private suspend fun getCurrentLocation(): Pair<Double, Double> {
+        Log.d(TAG, "Getting current location via backend")
+
+        val result = repository.getCurrentLocation()
+        return result.getOrElse {
+            Log.w(TAG, "Failed to get current location, using default")
+            Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG)
+        }
+    }
+
+    /**
+     * Geocode a location string to coordinates
+     */
+    private suspend fun geocodeLocation(location: String): Pair<Double, Double> {
+        Log.d(TAG, "Geocoding location: $location")
+
+        val result = repository.geocodeLocation(location)
+        return result.getOrElse {
+            Log.w(TAG, "Failed to geocode location, using default")
+            Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG)
+        }
+    }
+
+    /**
      * Clear search results
      */
     fun clearResults() {
         _searchResults.value = emptyList()
         _error.value = null
+        lastSearchParams = null
     }
 
     /**
@@ -103,6 +165,20 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun clearError() {
         _error.value = null
+    }
+
+    /**
+     * Get search history from preferences
+     */
+    fun getSearchHistory(): List<String> {
+        return preferencesManager.getSearchHistory()
+    }
+
+    /**
+     * Clear search history
+     */
+    fun clearSearchHistory() {
+        preferencesManager.clearSearchHistory()
     }
 
     /**
