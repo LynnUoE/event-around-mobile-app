@@ -8,6 +8,8 @@ import com.csci571.hw4.eventsaround.data.local.PreferencesManager
 import com.csci571.hw4.eventsaround.data.model.Event
 import com.csci571.hw4.eventsaround.data.model.SearchParams
 import com.csci571.hw4.eventsaround.data.repository.EventRepository
+import com.csci571.hw4.eventsaround.data.remote.GooglePlacesService
+import com.csci571.hw4.eventsaround.data.remote.IPInfoService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,6 +40,14 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     // Autocomplete suggestions
     private val _suggestions = MutableStateFlow<List<String>>(emptyList())
     val suggestions: StateFlow<List<String>> = _suggestions.asStateFlow()
+
+    // Location suggestions state
+    private val _locationSuggestions = MutableStateFlow<List<String>>(emptyList())
+    val locationSuggestions: StateFlow<List<String>> = _locationSuggestions.asStateFlow()
+
+    // Current location state
+    private val _currentLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    val currentLocation: StateFlow<Pair<Double, Double>?> = _currentLocation.asStateFlow()
 
     // Last search params for reference
     private var lastSearchParams: SearchParams? = null
@@ -126,27 +136,94 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /**
-     * Get current location using IP-based geolocation
+     * Load location suggestions using Google Places API
+     * PUBLIC method - called from SearchScreen
+     */
+    fun loadLocationSuggestions(query: String) {
+        if (query.length < 2) {
+            _locationSuggestions.value = emptyList()
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Loading location suggestions for: $query")
+
+                // Use GooglePlacesService directly
+                val placesService = GooglePlacesService.getInstance()
+                val suggestions = placesService.getLocationSuggestions(query)
+
+                _locationSuggestions.value = suggestions
+                Log.d(TAG, "Location suggestions: ${suggestions.size} found")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading location suggestions", e)
+                _locationSuggestions.value = emptyList()
+            }
+        }
+    }
+
+    /**
+     * Fetch current device location using IP-based geolocation
+     * PUBLIC method - called when user selects "Current Location"
+     */
+    fun fetchCurrentLocation() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Fetching current location")
+
+                // Use IPInfoService directly
+                val ipInfoService = IPInfoService.getInstance()
+                val location = ipInfoService.getCurrentLocation()
+
+                _currentLocation.value = location
+                Log.d(TAG, "Current location: (${location.first}, ${location.second})")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting current location", e)
+                // Use default location
+                _currentLocation.value = Pair(
+                    SearchParams.DEFAULT_LAT,
+                    SearchParams.DEFAULT_LNG
+                )
+            }
+        }
+    }
+
+    /**
+     * Clear location suggestions
+     */
+    fun clearLocationSuggestions() {
+        _locationSuggestions.value = emptyList()
+    }
+
+    /**
+     * Get current location using IP-based geolocation (internal)
+     * PRIVATE method - used internally by searchEvents
      */
     private suspend fun getCurrentLocation(): Pair<Double, Double> {
-        Log.d(TAG, "Getting current location via backend")
+        Log.d(TAG, "Getting current location via IP")
 
-        val result = repository.getCurrentLocation()
-        return result.getOrElse {
-            Log.w(TAG, "Failed to get current location, using default")
+        return try {
+            val ipInfoService = IPInfoService.getInstance()
+            ipInfoService.getCurrentLocation()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get current location, using default", e)
             Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG)
         }
     }
 
     /**
-     * Geocode a location string to coordinates
+     * Geocode a location string to coordinates (internal)
+     * PRIVATE method - used internally by searchEvents
      */
     private suspend fun geocodeLocation(location: String): Pair<Double, Double> {
         Log.d(TAG, "Geocoding location: $location")
 
-        val result = repository.geocodeLocation(location)
-        return result.getOrElse {
-            Log.w(TAG, "Failed to geocode location, using default")
+        return try {
+            val placesService = GooglePlacesService.getInstance()
+            val coords = placesService.geocodeAddress(location)
+            coords ?: Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to geocode location, using default", e)
             Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG)
         }
     }

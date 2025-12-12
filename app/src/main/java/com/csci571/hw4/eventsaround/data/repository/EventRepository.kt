@@ -5,6 +5,8 @@ import com.csci571.hw4.eventsaround.data.model.*
 import com.csci571.hw4.eventsaround.data.remote.RetrofitClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.csci571.hw4.eventsaround.data.remote.GooglePlacesService
+import com.csci571.hw4.eventsaround.data.remote.IPInfoService
 
 /**
  * EventRepository - Handles all event-related data operations
@@ -37,6 +39,33 @@ class EventRepository private constructor() {
             }
         }
     }
+    /**
+     * Get location suggestions using Google Places API (direct call from app)
+     * @param query User's text input (minimum 2 characters)
+     * @return Result containing list of location suggestions
+     */
+    suspend fun getLocationSuggestions(query: String): Result<List<String>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                if (query.length < 2) {
+                    return@withContext Result.success(emptyList())
+                }
+
+                Log.d(TAG, "Getting location suggestions for: $query")
+
+                // Use GooglePlacesService singleton
+                val placesService = GooglePlacesService.getInstance()
+                val suggestions = placesService.getLocationSuggestions(query)
+
+                Log.d(TAG, "Retrieved ${suggestions.size} location suggestions")
+                Result.success(suggestions)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error getting location suggestions", e)
+                Result.failure(e)
+            }
+        }
+    }
+
 
     /**
      * Search for events with given parameters
@@ -124,66 +153,57 @@ class EventRepository private constructor() {
     }
 
     /**
-     * Get current location based on IP address
-     * Uses IPInfo service via backend
+     * Get current location based on IP address (direct call from app)
+     * Uses IPInfo service
+     * @return Result containing Pair of (latitude, longitude)
      */
     suspend fun getCurrentLocation(): Result<Pair<Double, Double>> {
         return withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "Getting current location via IP")
+                Log.d(TAG, "Getting current location from IP")
 
-                val response = apiService.getCurrentLocation()
+                // Use IPInfoService singleton
+                val ipInfoService = IPInfoService.getInstance()
+                val location = ipInfoService.getCurrentLocation()
 
-                if (response.isSuccessful && response.body() != null) {
-                    val location = response.body()!!
-                    Log.d(TAG, "Location detected: (${location.lat}, ${location.lng})")
-                    Result.success(Pair(location.lat, location.lng))
-                } else {
-                    Log.w(TAG, "Location API failed, using default")
-                    // Return default LA coordinates
-                    Result.success(Pair(
-                        SearchParams.DEFAULT_LAT,
-                        SearchParams.DEFAULT_LNG
-                    ))
-                }
+                Log.d(TAG, "Current location: (${location.first}, ${location.second})")
+                Result.success(location)
             } catch (e: Exception) {
-                Log.e(TAG, "Location error, using default", e)
-                // Return default LA coordinates on error
-                Result.success(Pair(
-                    SearchParams.DEFAULT_LAT,
-                    SearchParams.DEFAULT_LNG
-                ))
+                Log.e(TAG, "Error getting current location", e)
+                // Return default LA coordinates
+                Result.success(Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG))
             }
         }
     }
 
     /**
-     * Geocode a location string to coordinates
-     * Uses Google Geocoding API via backend
+     * Geocode a location string to coordinates (direct call from app)
+     * Uses Google Geocoding API
+     * @param address Location string to geocode (e.g., "Boston, MA, USA")
+     * @return Result containing Pair of (latitude, longitude)
      */
     suspend fun geocodeLocation(address: String): Result<Pair<Double, Double>> {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Geocoding address: $address")
 
-                val response = apiService.geocodeLocation(address)
+                // Use GooglePlacesService singleton
+                val placesService = GooglePlacesService.getInstance()
+                val location = placesService.geocodeAddress(address)
 
-                if (response.isSuccessful && response.body() != null) {
-                    val geocode = response.body()!!
-                    Log.d(TAG, "Geocoded to: (${geocode.lat}, ${geocode.lng})")
-                    Result.success(Pair(geocode.lat, geocode.lng))
+                if (location != null) {
+                    Log.d(TAG, "Geocoded to: (${location.first}, ${location.second})")
+                    Result.success(location)
                 } else {
-                    Result.failure(
-                        Exception("Unable to geocode location: ${response.message()}")
-                    )
+                    Log.w(TAG, "Failed to geocode address, using default coordinates")
+                    Result.success(Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG))
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Geocoding error", e)
-                Result.failure(e)
+                Log.e(TAG, "Error geocoding address", e)
+                Result.success(Pair(SearchParams.DEFAULT_LAT, SearchParams.DEFAULT_LNG))
             }
         }
     }
-
     /**
      * Search for artist on Spotify
      * Backend returns the artist object directly, not a search response
