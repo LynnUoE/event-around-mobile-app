@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -28,17 +26,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.csci571.hw4.eventsaround.data.model.EventClassification
 import com.csci571.hw4.eventsaround.data.model.EventDetails
 import com.csci571.hw4.eventsaround.ui.viewmodel.EventDetailsViewModel
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.math.abs
-
-
-import coil.request.ImageRequest
 
 /**
  * Details Screen - Shows comprehensive information about a single event
+ * Now supports dark mode
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +64,7 @@ fun DetailsScreen(
                     Text(
                         text = eventDetails?.name ?: "",
                         fontSize = 18.sp,
+                        fontWeight = FontWeight.Normal,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -76,22 +73,22 @@ fun DetailsScreen(
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 actions = {
-                    // Favorite button only
                     IconButton(onClick = { viewModel.toggleFavorite() }) {
                         Icon(
                             imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                             contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                            tint = if (isFavorite) Color(0xFFFFD700) else Color.Gray
+                            tint = if (isFavorite) Color.Yellow else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFE3F2FD)
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
         }
@@ -109,49 +106,22 @@ fun DetailsScreen(
                 }
 
                 error != null -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Error: $error",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.clearError() }) {
-                            Text("Dismiss")
-                        }
-                    }
+                    Text(
+                        text = error ?: "Unknown error",
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
 
                 eventDetails != null -> {
                     val currentEventDetails = eventDetails!!
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                // Swipe gesture to change tabs
-                                detectHorizontalDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    if (abs(dragAmount) > 50) {
-                                        if (dragAmount < 0 && selectedTab < 2) {
-                                            // Swipe left - next tab
-                                            selectedTab++
-                                        } else if (dragAmount > 0 && selectedTab > 0) {
-                                            // Swipe right - previous tab
-                                            selectedTab--
-                                        }
-                                    }
-                                }
-                            }
-                    ) {
-                        // Tabs with icons
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Tab Row
                         TabRow(
                             selectedTabIndex = selectedTab,
-                            containerColor = Color.White
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                         ) {
                             Tab(
                                 selected = selectedTab == 0,
@@ -200,7 +170,8 @@ fun DetailsScreen(
                 else -> {
                     Text(
                         text = "No event data available",
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
@@ -209,7 +180,7 @@ fun DetailsScreen(
 }
 
 /**
- * Details tab content - Card-based design like Figure 11
+ * Details tab content
  */
 @Composable
 fun DetailsTab(event: EventDetails) {
@@ -219,7 +190,7 @@ fun DetailsTab(event: EventDetails) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -227,7 +198,7 @@ fun DetailsTab(event: EventDetails) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFFF5F5F5)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
             ),
             shape = RoundedCornerShape(8.dp)
         ) {
@@ -244,51 +215,52 @@ fun DetailsTab(event: EventDetails) {
                     Text(
                         text = "Event",
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Gray
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        // External link icon
+                        // Ticketmaster link
                         event.url?.let { url ->
-                            Icon(
-                                imageVector = Icons.Default.Launch,
-                                contentDescription = "Open event link",
-                                tint = Color.Gray,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clickable {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                        context.startActivity(intent)
-                                    }
-                            )
+                            IconButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Launch,
+                                    contentDescription = "Open in Ticketmaster",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
-                        // Share icon
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = Color.Gray,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clickable {
-                                    event.url?.let { url ->
-                                        val shareIntent = Intent.createChooser(
-                                            Intent().apply {
-                                                action = Intent.ACTION_SEND
-                                                putExtra(Intent.EXTRA_TEXT, url)
-                                                type = "text/plain"
-                                            },
-                                            "Share event"
-                                        )
-                                        context.startActivity(shareIntent)
+                        // Share button
+                        IconButton(
+                            onClick = {
+                                event.url?.let { url ->
+                                    val shareIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, url)
+                                        type = "text/plain"
                                     }
+                                    context.startActivity(Intent.createChooser(shareIntent, "Share event"))
                                 }
-                        )
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
 
-                HorizontalDivider(color = Color.LightGray)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
                 // Date
                 DetailItem(
@@ -322,7 +294,7 @@ fun DetailsTab(event: EventDetails) {
                             text = "Genres",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -330,26 +302,31 @@ fun DetailsTab(event: EventDetails) {
                         ) {
                             genres.forEach { genre ->
                                 Surface(
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.surface,
                                     shape = RoundedCornerShape(16.dp),
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
-                                        Color.LightGray
+                                        MaterialTheme.colorScheme.outline
                                     )
                                 ) {
                                     Text(
                                         text = genre,
-                                        modifier = Modifier.padding(
-                                            horizontal = 12.dp,
-                                            vertical = 6.dp
-                                        ),
-                                        fontSize = 13.sp,
-                                        color = Color.DarkGray
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
                         }
                     }
+                }
+
+                // Price Ranges
+                event.priceRanges?.firstOrNull()?.let { priceRange ->
+                    DetailItem(
+                        label = "Price Ranges",
+                        value = "$${priceRange.min} - $${priceRange.max}"
+                    )
                 }
 
                 // Ticket Status
@@ -359,23 +336,41 @@ fun DetailsTab(event: EventDetails) {
                             text = "Ticket Status",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Surface(
                             color = getStatusColor(statusCode),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                text = formatStatus(statusCode),
-                                modifier = Modifier.padding(
-                                    horizontal = 16.dp,
-                                    vertical = 8.dp
-                                ),
-                                fontSize = 13.sp,
+                                text = formatStatusCode(statusCode),
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                fontSize = 14.sp,
                                 color = Color.White,
                                 fontWeight = FontWeight.Medium
                             )
                         }
+                    }
+                }
+
+                // Buy Ticket At
+                event.url?.let { url ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Buy Ticket At",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Ticketmaster",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            }
+                        )
                     }
                 }
             }
@@ -386,7 +381,7 @@ fun DetailsTab(event: EventDetails) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -397,8 +392,8 @@ fun DetailsTab(event: EventDetails) {
                     Text(
                         text = "Seatmap",
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.Black
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     AsyncImage(
@@ -406,7 +401,8 @@ fun DetailsTab(event: EventDetails) {
                         contentDescription = "Seatmap",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(250.dp),
+                            .height(250.dp)
+                            .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -440,7 +436,7 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         when {
             !isMusicEvent -> {
@@ -452,7 +448,7 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                     Text(
                         text = "No artist data",
                         fontSize = 16.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -473,11 +469,11 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Artist card
+                    // Artist info card
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFF5F5F5)
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -499,11 +495,12 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                                 )
                             }
 
-                            // Artist info
+                            // Artist details
                             Column(
                                 modifier = Modifier.weight(1f),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
+                                // Artist name with external link
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -512,7 +509,8 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                                     Text(
                                         text = artist.name,
                                         fontSize = 18.sp,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
                                     // External link icon
@@ -520,7 +518,7 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                                         Icon(
                                             imageVector = Icons.Default.Launch,
                                             contentDescription = "Open in Spotify",
-                                            tint = Color.Gray,
+                                            tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier
                                                 .size(24.dp)
                                                 .clickable {
@@ -539,36 +537,29 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                                     Text(
                                         text = "Followers: ${formatFollowersNumber(artist.followers.total)}",
                                         fontSize = 13.sp,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
 
                                     Text(
                                         text = "Popularity: ${artist.popularity}%",
                                         fontSize = 13.sp,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
 
                                 // Genre
                                 if (artist.genres.isNotEmpty()) {
-                                    Surface(
-                                        color = Color.White,
-                                        shape = RoundedCornerShape(16.dp),
-                                        border = androidx.compose.foundation.BorderStroke(
-                                            1.dp,
-                                            Color.LightGray
-                                        )
-                                    ) {
-                                        Text(
-                                            text = artist.genres.first(),
-                                            modifier = Modifier.padding(
-                                                horizontal = 12.dp,
-                                                vertical = 6.dp
-                                            ),
-                                            fontSize = 12.sp,
-                                            color = Color.DarkGray
-                                        )
-                                    }
+                                    Text(
+                                        text = artist.genres.firstOrNull() ?: "",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier
+                                            .background(
+                                                MaterialTheme.colorScheme.surface,
+                                                RoundedCornerShape(12.dp)
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
                                 }
                             }
                         }
@@ -579,10 +570,11 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                         Text(
                             text = "Albums",
                             fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        // Grid of albums
+                        // Albums grid - 2 columns
                         Column(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
@@ -594,16 +586,10 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                                     rowAlbums.forEach { album ->
                                         AlbumCard(
                                             album = album,
-                                            modifier = Modifier.weight(1f),
-                                            onClick = {
-                                                album.external_urls.spotify?.let { spotifyUrl ->
-                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spotifyUrl))
-                                                    context.startActivity(intent)
-                                                }
-                                            }
+                                            modifier = Modifier.weight(1f)
                                         )
                                     }
-                                    // Add empty space if odd number of albums
+                                    // Fill remaining space if odd number
                                     if (rowAlbums.size == 1) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
@@ -622,7 +608,7 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
                     Text(
                         text = "No artist data available",
                         fontSize = 16.sp,
-                        color = Color.Gray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -636,20 +622,24 @@ fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
 @Composable
 fun AlbumCard(
     album: com.csci571.hw4.eventsaround.data.model.Album,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+
     Card(
-        modifier = modifier.clickable(onClick = onClick),
+        modifier = modifier.clickable {
+            album.external_urls.spotify?.let { url ->
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                context.startActivity(intent)
+            }
+        },
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF5F5F5)
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         shape = RoundedCornerShape(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp)
-        ) {
-            // Album image
+        Column {
+            // Album cover image
             album.images.firstOrNull()?.url?.let { imageUrl ->
                 AsyncImage(
                     model = imageUrl,
@@ -657,171 +647,160 @@ fun AlbumCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(4.dp)),
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
                     contentScale = ContentScale.Crop
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Album info
+            Column(
+                modifier = Modifier.padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = album.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-            // Album name
-            Text(
-                text = album.name,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+                Text(
+                    text = formatReleaseDate(album.release_date),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
 
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Release date and tracks
-            Text(
-                text = formatReleaseDate(album.release_date),
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-
-            Text(
-                text = "${album.total_tracks} tracks",
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
+                Text(
+                    text = "${album.total_tracks} tracks",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
 
 /**
- * Format followers count with commas (e.g., 122,989,098)
+ * Format followers number to K/M format
  */
-private fun formatFollowersNumber(count: Int): String {
-    return String.format("%,d", count)
-}
-
-/**
- * Format followers count to K or M (for compact display if needed)
- */
-private fun formatFollowers(count: Int): String {
+private fun formatFollowersNumber(followers: Int): String {
     return when {
-        count >= 1_000_000 -> {
-            val millions = count / 1_000_000.0
-            String.format("%.1fM", millions).replace(".0M", "M")
-        }
-        count >= 1_000 -> {
-            val thousands = count / 1_000.0
-            String.format("%.1fK", thousands).replace(".0K", "K")
-        }
-        else -> count.toString()
+        followers >= 1_000_000 -> String.format("%.1fM", followers / 1_000_000.0)
+        followers >= 1_000 -> String.format("%.1fK", followers / 1_000.0)
+        else -> followers.toString()
     }
 }
 
 /**
  * Format release date
  */
-private fun formatReleaseDate(dateString: String): String {
+private fun formatReleaseDate(releaseDate: String): String {
     return try {
-        val parts = dateString.split("-")
-        val year = parts[0]
-        val month = if (parts.size > 1) parts[1] else "01"
-        val day = if (parts.size > 2) parts[2] else "01"
-
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val date = inputFormat.parse("$year-$month-$day")
-        val outputFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
-        date?.let { outputFormat.format(it) } ?: dateString
+        val parts = releaseDate.split("-")
+        when (parts.size) {
+            3 -> {
+                val year = parts[0]
+                val month = parts[1].toIntOrNull()
+                val day = parts[2]
+                val monthName = when (month) {
+                    1 -> "Jan"
+                    2 -> "Feb"
+                    3 -> "Mar"
+                    4 -> "Apr"
+                    5 -> "May"
+                    6 -> "Jun"
+                    7 -> "Jul"
+                    8 -> "Aug"
+                    9 -> "Sep"
+                    10 -> "Oct"
+                    11 -> "Nov"
+                    12 -> "Dec"
+                    else -> ""
+                }
+                "$monthName $day, $year"
+            }
+            1 -> parts[0] // Just year
+            else -> releaseDate
+        }
     } catch (e: Exception) {
-        dateString
+        releaseDate
     }
 }
 
 /**
- * Venue tab content - Shows venue information with real images and Ticketmaster link
- * Only displays external link and image when venue has valid URL from Ticketmaster
+ * Venue tab content
  */
 @Composable
 fun VenueTab(event: EventDetails) {
     val context = LocalContext.current
     val venue = event._embedded?.venues?.firstOrNull()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .background(Color.White)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        if (venue != null) {
-            // Check if venue has valid URL (indicates it's a real venue from Ticketmaster)
-            val hasValidVenueInfo = !venue.url.isNullOrEmpty()
+    if (venue != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Venue image or placeholder
+            venue.images?.firstOrNull()?.url?.let { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = venue.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            } ?: run {
+                // Placeholder
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "Venue",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(80.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = venue.name,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
 
-            // Venue card
+            // Venue details card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF5F5F5)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Only show venue image if venue has valid URL/info
-                    if (hasValidVenueInfo) {
-                        val imageUrl = venue.images?.firstOrNull()?.url
-
-                        if (imageUrl != null) {
-                            // Display real venue image using Coil
-                            AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(imageUrl)
-                                    .crossfade(true)
-                                    .build(),
-                                contentDescription = "Venue image",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
-                        } else {
-                            // Fallback placeholder if no image but has valid venue
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF00BCD4)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                    modifier = Modifier.padding(16.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.LocationOn,
-                                        contentDescription = "Venue",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(80.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Text(
-                                        text = venue.name,
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White,
-                                        textAlign = TextAlign.Center,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Venue name and external link icon (only show link if venue has URL)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -831,29 +810,27 @@ fun VenueTab(event: EventDetails) {
                             text = venue.name,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
 
-                        // Only show external link icon if venue has valid URL
-                        if (hasValidVenueInfo) {
-                            Icon(
-                                imageVector = Icons.Default.Launch,
-                                contentDescription = "Open venue on Ticketmaster",
-                                tint = Color.Gray,
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clickable {
-                                        // Use venue URL from API
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(venue.url))
-                                        context.startActivity(intent)
-                                    }
-                            )
+                        venue.url?.let { url ->
+                            IconButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                    context.startActivity(intent)
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Launch,
+                                    contentDescription = "Open venue page",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
 
-                    // Address - always show if available, format: line1, city, state postalCode
+                    // Address
                     val addressParts = mutableListOf<String>()
-
                     venue.address?.line1?.let { addressParts.add(it) }
 
                     val cityStateZip = buildString {
@@ -876,25 +853,26 @@ fun VenueTab(event: EventDetails) {
                         Text(
                             text = addressParts.joinToString(", "),
                             fontSize = 14.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             }
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No venue information available",
-                    fontSize = 16.sp,
-                    color = Color.Gray
-                )
-            }
+        }
+    } else {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "No venue information available",
+                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
+
 /**
  * Detail item component
  */
@@ -905,14 +883,29 @@ fun DetailItem(label: String, value: String) {
             text = label,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            color = Color.Gray
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
             fontSize = 14.sp,
-            color = Color.Black
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
+}
+
+/**
+ * Build genres list from classification
+ */
+private fun buildGenresList(classification: EventClassification?): List<String> {
+    val genres = mutableListOf<String>()
+    classification?.let {
+        it.segment?.name?.let { name -> genres.add(name) }
+        it.genre?.name?.let { name -> genres.add(name) }
+        it.subGenre?.name?.let { name -> genres.add(name) }
+        it.type?.name?.let { name -> genres.add(name) }
+        it.subType?.name?.let { name -> genres.add(name) }
+    }
+    return genres.filter { it.isNotBlank() && it.lowercase() != "undefined" }.distinct()
 }
 
 /**
@@ -926,99 +919,55 @@ private fun formatEventDateTime(dateString: String?, timeString: String?): Strin
         val date = inputDateFormat.parse(dateString)
 
         val calendar = Calendar.getInstance()
-        calendar.time = date ?: return dateString
+        calendar.time = date ?: return "TBA"
 
-        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
-        val eventYear = calendar.get(Calendar.YEAR)
+        val dayOfWeek = SimpleDateFormat("EEE", Locale.US).format(calendar.time)
+        val month = SimpleDateFormat("MMM", Locale.US).format(calendar.time)
+        val day = calendar.get(Calendar.DAY_OF_MONTH)
+        val year = calendar.get(Calendar.YEAR)
 
-        // Format: "Aug 8, 2026, 5:30 PM" or "Dec 3, 5:00 PM" (omit year if current)
-        val dateFormat = if (eventYear == currentYear) {
-            SimpleDateFormat("MMM d", Locale.US)
-        } else {
-            SimpleDateFormat("MMM d, yyyy", Locale.US)
-        }
+        val formattedDate = "$dayOfWeek, $month $day, $year"
 
-        val formattedDate = dateFormat.format(date)
-
-        if (!timeString.isNullOrEmpty()) {
-            try {
-                val inputTimeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
-                val time = inputTimeFormat.parse(timeString)
+        if (timeString != null) {
+            val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
+            val time = timeFormat.parse(timeString)
+            time?.let {
                 val outputTimeFormat = SimpleDateFormat("h:mm a", Locale.US)
-                val formattedTime = time?.let { outputTimeFormat.format(it) } ?: ""
-                "$formattedDate, $formattedTime"
-            } catch (e: Exception) {
-                formattedDate
-            }
+                "$formattedDate, ${outputTimeFormat.format(it)}"
+            } ?: formattedDate
         } else {
             formattedDate
         }
     } catch (e: Exception) {
-        dateString
+        "TBA"
     }
 }
 
 /**
- * Build genres list from classification - remove duplicates and undefined
+ * Format status code
  */
-private fun buildGenresList(classification: com.csci571.hw4.eventsaround.data.model.EventClassification?): List<String> {
-    if (classification == null) return emptyList()
-
-    val genres = mutableListOf<String>()
-
-    // Add each genre type if it exists and is not empty/undefined
-    classification.segment?.name?.let {
-        if (it.isNotBlank() && it.lowercase() != "undefined") {
-            genres.add(it)
-        }
-    }
-    classification.genre?.name?.let {
-        if (it.isNotBlank() && it.lowercase() != "undefined") {
-            genres.add(it)
-        }
-    }
-    classification.subGenre?.name?.let {
-        if (it.isNotBlank() && it.lowercase() != "undefined") {
-            genres.add(it)
-        }
-    }
-    classification.type?.name?.let {
-        if (it.isNotBlank() && it.lowercase() != "undefined") {
-            genres.add(it)
-        }
-    }
-    classification.subType?.name?.let {
-        if (it.isNotBlank() && it.lowercase() != "undefined") {
-            genres.add(it)
-        }
-    }
-
-    // Remove duplicates while preserving order
-    return genres.distinct()
-}
-
-/**
- * Get status color based on status code
- */
-private fun getStatusColor(statusCode: String): Color {
-    return when (statusCode.lowercase()) {
-        "onsale" -> Color(0xFF1976D2) // Primary
-        "offsale" -> Color(0xFF757575) // Secondary
-        "canceled", "cancelled" -> Color(0xFFD32F2F) // Error
-        "postponed" -> Color(0xFFF57C00) // Warning
-        else -> Color.Gray
-    }
-}
-
-/**
- * Format status text
- */
-private fun formatStatus(statusCode: String): String {
-    return when (statusCode.lowercase()) {
+private fun formatStatusCode(code: String): String {
+    return when (code.lowercase()) {
         "onsale" -> "On Sale"
         "offsale" -> "Off Sale"
         "canceled" -> "Canceled"
+        "cancelled" -> "Cancelled"
         "postponed" -> "Postponed"
-        else -> statusCode.uppercase()
+        "rescheduled" -> "Rescheduled"
+        else -> code.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+    }
+}
+
+/**
+ * Get status color
+ */
+private fun getStatusColor(code: String): Color {
+    return when (code.lowercase()) {
+        "onsale" -> Color(0xFF4CAF50) // Green
+        "offsale" -> Color(0xFFF44336) // Red
+        "canceled", "cancelled" -> Color(0xFF9E9E9E) // Gray
+        "postponed" -> Color(0xFFFF9800) // Orange
+        "rescheduled" -> Color(0xFF2196F3) // Blue
+        else -> Color(0xFF607D8B) // Blue Gray
     }
 }

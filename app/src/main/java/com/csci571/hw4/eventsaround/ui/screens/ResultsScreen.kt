@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,6 +30,7 @@ import java.util.*
 
 /**
  * Results Screen - Displays search results with category tabs and filtering
+ * Now supports dark mode
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +38,7 @@ fun ResultsScreen(
     onNavigateBack: () -> Unit,
     onEventClick: (String) -> Unit,
     searchViewModel: SearchViewModel = viewModel(),
-    resultsViewModel: ResultsViewModel = viewModel()  // Add ResultsViewModel for favorite management
+    resultsViewModel: ResultsViewModel = viewModel()
 ) {
     // Collect states from SearchViewModel
     val searchResults by searchViewModel.searchResults.collectAsState()
@@ -94,7 +94,8 @@ fun ResultsScreen(
                         IconButton(onClick = onNavigateBack) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back"
+                                contentDescription = "Back",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     },
@@ -102,12 +103,13 @@ fun ResultsScreen(
                         IconButton(onClick = { /* Search action */ }) {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Search"
+                                contentDescription = "Search",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color(0xFFE3F2FD)
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 )
 
@@ -115,7 +117,7 @@ fun ResultsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFE3F2FD))
+                        .background(MaterialTheme.colorScheme.primaryContainer)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -128,32 +130,41 @@ fun ResultsScreen(
                         Icon(
                             imageVector = Icons.Default.LocationOn,
                             contentDescription = "Location",
-                            tint = Color.Gray,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (useCurrentLocation) "Current Location" else (lastSearchParams?.location ?: "Location"),
+                            text = if (useCurrentLocation) "Current Location" else (lastSearchParams?.location ?: ""),
                             fontSize = 14.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
+
+                    Spacer(modifier = Modifier.width(16.dp))
 
                     // Distance display
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Sync,
+                            imageVector = Icons.Default.KeyboardArrowLeft,
                             contentDescription = "Distance",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+
                         Text(
-                            text = "$distance mi",
+                            text = "$distance",
                             fontSize = 14.sp,
-                            color = Color.Gray
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Text(
+                            text = "mi",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -161,8 +172,8 @@ fun ResultsScreen(
                 // Category tabs
                 ScrollableTabRow(
                     selectedTabIndex = selectedCategory,
-                    containerColor = Color(0xFFE3F2FD),
-                    edgePadding = 0.dp
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ) {
                     categories.forEachIndexed { index, category ->
                         Tab(
@@ -171,8 +182,7 @@ fun ResultsScreen(
                             text = {
                                 Text(
                                     text = category,
-                                    fontSize = 14.sp,
-                                    fontWeight = if (selectedCategory == index) FontWeight.Bold else FontWeight.Normal
+                                    fontSize = 14.sp
                                 )
                             }
                         )
@@ -186,56 +196,44 @@ fun ResultsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            when {
-                isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-
-                error != null -> {
-                    Column(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Error: $error",
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { searchViewModel.clearError() }) {
-                            Text("Dismiss")
-                        }
-                    }
-                }
-
-                filteredResults.isEmpty() -> {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            } else if (filteredResults.isEmpty()) {
+                // No events found
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .align(Alignment.TopCenter),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
                     Text(
                         text = "No events found",
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Gray
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp),
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(filteredResults) { event ->
-                            EventResultCard(
-                                event = event,
-                                isFavorite = favoriteStates[event.id] ?: false,
-                                onEventClick = { onEventClick(event.id) },
-                                onFavoriteClick = {
-                                    resultsViewModel.toggleFavorite(event)
-                                }
-                            )
-                        }
+            } else {
+                // Event list
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredResults) { event ->
+                        EventResultCard(
+                            event = event,
+                            isFavorite = favoriteStates[event.id] ?: false,
+                            onClick = { onEventClick(event.id) },
+                            onFavoriteClick = { resultsViewModel.toggleFavorite(event) }
+                        )
                     }
                 }
             }
@@ -244,75 +242,66 @@ fun ResultsScreen(
 }
 
 /**
- * Event card component for search results with favorite button
+ * Event Result Card for search results
+ * Displays event image, name, venue, date/time, and favorite button
  */
 @Composable
-fun EventResultCard(
+private fun EventResultCard(
     event: Event,
     isFavorite: Boolean,
-    onEventClick: () -> Unit,
+    onClick: () -> Unit,
     onFavoriteClick: () -> Unit
 ) {
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onEventClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            .height(200.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        tonalElevation = 2.dp
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Event image
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-            ) {
-                AsyncImage(
-                    model = event.images?.firstOrNull()?.url ?: "",
-                    contentDescription = event.name,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Event image background
+            AsyncImage(
+                model = event.images?.firstOrNull()?.url ?: "",
+                contentDescription = event.name,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
 
-                // Category badge - top left
+            // Category badge - top left
+            Surface(
+                modifier = Modifier
+                    .padding(12.dp)
+                    .align(Alignment.TopStart),
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = event.category,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // Date & Time badge - top right
+            event.dates?.start?.let { start ->
                 Surface(
                     modifier = Modifier
                         .padding(12.dp)
-                        .align(Alignment.TopStart),
-                    color = Color.White,
-                    shape = RoundedCornerShape(12.dp)
+                        .align(Alignment.TopEnd),
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = event.category,
+                        text = formatDateTime(start.localDate, start.localTime),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         fontSize = 10.sp,
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Medium
                     )
-                }
-
-                // Date & Time badge - top right
-                event.dates?.start?.let { start ->
-                    Surface(
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .align(Alignment.TopEnd),
-                        color = Color.White,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = formatDateTime(start.localDate, start.localTime),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontSize = 10.sp,
-                            color = Color.Black,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                 }
             }
 
@@ -320,8 +309,9 @@ fun EventResultCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(12.dp),
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(12.dp)
+                    .align(Alignment.BottomStart),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -334,32 +324,28 @@ fun EventResultCard(
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = event.embedded?.venues?.firstOrNull()?.name ?: "Venue TBA",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray,
+                        text = event.embedded?.venues?.firstOrNull()?.name ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        fontSize = 14.sp
+                        fontSize = 12.sp
                     )
                 }
 
-                // Favorite star button
-                IconButton(
-                    onClick = onFavoriteClick,
-                    modifier = Modifier.size(40.dp)
-                ) {
+                // Favorite button
+                IconButton(onClick = onFavoriteClick) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                         contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                        tint = if (isFavorite) Color(0xFFFFD700) else Color.Gray,
-                        modifier = Modifier.size(28.dp)
+                        tint = if (isFavorite) androidx.compose.ui.graphics.Color.Yellow else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -368,27 +354,21 @@ fun EventResultCard(
 }
 
 /**
- * Format date and time to display format
+ * Format date and time for display
+ * Example: "Nov 14, 4:30 PM"
  */
-private fun formatDateTime(dateString: String?, timeString: String?): String {
+private fun formatDateTime(date: String?, time: String?): String {
     return try {
-        if (dateString.isNullOrEmpty()) return "Date TBA"
+        val parsedDate = date?.let { SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(it) }
+        val dateStr = parsedDate?.let { SimpleDateFormat("MMM dd", Locale.US).format(it) } ?: ""
 
-        val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val date = inputDateFormat.parse(dateString)
-        val outputDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
-        val formattedDate = date?.let { outputDateFormat.format(it) } ?: dateString
+        val timeStr = time?.let {
+            val parsedTime = SimpleDateFormat("HH:mm:ss", Locale.US).parse(it)
+            SimpleDateFormat("h:mm a", Locale.US).format(parsedTime)
+        } ?: ""
 
-        if (!timeString.isNullOrEmpty()) {
-            val inputTimeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
-            val time = inputTimeFormat.parse(timeString)
-            val outputTimeFormat = SimpleDateFormat("h:mm a", Locale.US)
-            val formattedTime = time?.let { outputTimeFormat.format(it) } ?: timeString
-            "$formattedDate, $formattedTime"
-        } else {
-            formattedDate
-        }
+        "$dateStr, $timeStr"
     } catch (e: Exception) {
-        "$dateString ${timeString ?: ""}"
+        ""
     }
 }

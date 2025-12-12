@@ -15,7 +15,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +26,7 @@ import coil.compose.AsyncImage
 import com.csci571.hw4.eventsaround.data.model.Event
 import com.csci571.hw4.eventsaround.ui.viewmodel.HomeViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -34,6 +34,7 @@ import java.util.*
  * Home Screen - Favorites List
  * Displays favorite events with "Powered by Ticketmaster" link
  * Content aligned to top (not centered)
+ * Now supports dark mode
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +77,7 @@ fun HomeScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFE3F2FD) // Light blue background
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
             )
         }
@@ -93,7 +94,7 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
                 fontSize = 14.sp,
-                color = Color.Gray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             // "Favorites" header
@@ -104,7 +105,7 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = MaterialTheme.colorScheme.onSurface
             )
 
             // Content area - aligned to top
@@ -117,7 +118,7 @@ fun HomeScreen(
                 ) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFE3F2FD), // Light blue background
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
@@ -127,17 +128,17 @@ fun HomeScreen(
                                 .padding(vertical = 40.dp),
                             fontSize = 16.sp,
                             textAlign = TextAlign.Center,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             } else {
-                // Favorites list - starts from top
+                // LazyColumn for favorite events
                 LazyColumn(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f), // Take available space
-                    contentPadding = PaddingValues(16.dp),
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(favoriteEvents) { event ->
@@ -149,115 +150,125 @@ fun HomeScreen(
                 }
             }
 
-            // "Powered by Ticketmaster" link - always at the bottom of content
-            Text(
-                text = "Powered by Ticketmaster",
+            // "Powered by Ticketmaster" link at the bottom
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(16.dp)
                     .clickable {
-                        val intent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://www.ticketmaster.com")
-                        )
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.ticketmaster.com"))
                         context.startActivity(intent)
-                    }
-                    .padding(vertical = 16.dp),
-                fontSize = 14.sp,
-                color = Color.Gray,
-                textAlign = TextAlign.Center,
-                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
-            )
+                    },
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Powered by Ticketmaster",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                )
+            }
         }
     }
 }
 
 /**
- * Favorite event card component
- * Displays event info with image, time ago, and arrow icon
+ * Favorite Event Card for Home Screen
+ * Displays event thumbnail, name, date and time ago (updates in real-time)
  */
 @Composable
-fun FavoriteEventCard(
+private fun FavoriteEventCard(
     event: Event,
     onClick: () -> Unit
 ) {
-    // State for dynamic time updates
-    var timeAgo by remember { mutableStateOf(calculateTimeAgo(event.favoritedAt ?: System.currentTimeMillis())) }
+    // State to trigger recomposition every second for time update
+    var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
-    // Update time every second
-    LaunchedEffect(event.favoritedAt) {
+    // Update current time every second
+    LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(1000) // Update every 1 second
-            timeAgo = calculateTimeAgo(event.favoritedAt ?: System.currentTimeMillis())
+            delay(1000L) // Update every 1 second
+            currentTime = System.currentTimeMillis()
         }
     }
 
-    Card(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Event image (left side)
+            // Event thumbnail
             AsyncImage(
                 model = event.images?.firstOrNull()?.url ?: "",
                 contentDescription = event.name,
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(4.dp)),
                 contentScale = ContentScale.Crop
             )
 
-            // Event details (middle)
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Event details
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 // Event name
                 Text(
                     text = event.name,
-                    fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
-                    maxLines = 2,
-                    color = Color.Black
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Date and time
+                // Event date and time
                 Text(
-                    text = formatEventDateTime(event),
-                    fontSize = 14.sp,
-                    color = Color.Gray
+                    text = formatEventDateTime(
+                        event.dates?.start?.localDate,
+                        event.dates?.start?.localTime
+                    ),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
 
-            // Time ago and arrow (right side)
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.Center
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Time ago and arrow (updates in real-time)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End
             ) {
                 Text(
-                    text = timeAgo,
+                    text = getTimeAgo(event.favoritedAt ?: 0L, currentTime),
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.width(4.dp))
 
                 Icon(
                     imageVector = Icons.Default.ArrowForwardIos,
                     contentDescription = "View details",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -265,39 +276,18 @@ fun FavoriteEventCard(
 }
 
 /**
- * Calculate time elapsed since event was favorited
- */
-private fun calculateTimeAgo(favoritedTimestamp: Long): String {
-    val now = System.currentTimeMillis()
-    val diff = now - favoritedTimestamp
-
-    val seconds = diff / 1000
-    val minutes = seconds / 60
-    val hours = minutes / 60
-    val days = hours / 24
-
-    return when {
-        seconds < 60 -> "$seconds second${if (seconds == 1L) "" else "s"} ago"
-        minutes < 60 -> "$minutes minute${if (minutes == 1L) "" else "s"} ago"
-        hours < 24 -> "$hours hour${if (hours == 1L) "" else "s"} ago"
-        else -> "$days day${if (days == 1L) "" else "s"} ago"
-    }
-}
-
-/**
  * Format event date and time for display
  */
-private fun formatEventDateTime(event: Event): String {
+private fun formatEventDateTime(dateString: String?, timeString: String?): String {
     return try {
-        val dateString = event.dates?.start?.localDate
-        val timeString = event.dates?.start?.localTime
-
-        if (dateString.isNullOrEmpty()) return "Date TBA"
-
-        val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val date = inputDateFormat.parse(dateString)
-        val outputDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
-        val formattedDate = date?.let { outputDateFormat.format(it) } ?: dateString
+        val formattedDate = if (!dateString.isNullOrEmpty()) {
+            val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val outputDateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.US)
+            val date = inputDateFormat.parse(dateString)
+            date?.let { outputDateFormat.format(it) } ?: dateString
+        } else {
+            "Date TBA"
+        }
 
         if (!timeString.isNullOrEmpty()) {
             val inputTimeFormat = SimpleDateFormat("HH:mm:ss", Locale.US)
@@ -310,5 +300,35 @@ private fun formatEventDateTime(event: Event): String {
         }
     } catch (e: Exception) {
         "Date TBA"
+    }
+}
+
+/**
+ * Calculate time ago from timestamp
+ * Returns formatted string like "5 seconds ago", "2 minutes ago", etc.
+ *
+ * @param timestamp The timestamp when event was favorited
+ * @param currentTime The current time (for real-time updates)
+ */
+private fun getTimeAgo(timestamp: Long, currentTime: Long = System.currentTimeMillis()): String {
+    val diff = currentTime - timestamp
+
+    return when {
+        diff < 60_000 -> {
+            val seconds = (diff / 1000).toInt()
+            if (seconds <= 1) "1 second ago" else "$seconds seconds ago"
+        }
+        diff < 3_600_000 -> {
+            val minutes = (diff / 60_000).toInt()
+            if (minutes == 1) "1 minute ago" else "$minutes minutes ago"
+        }
+        diff < 86_400_000 -> {
+            val hours = (diff / 3_600_000).toInt()
+            if (hours == 1) "1 hour ago" else "$hours hours ago"
+        }
+        else -> {
+            val days = (diff / 86_400_000).toInt()
+            if (days == 1) "1 day ago" else "$days days ago"
+        }
     }
 }

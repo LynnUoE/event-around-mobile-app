@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Search Screen - Event search form with autocomplete
+ * Now supports dark mode
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +68,7 @@ fun SearchScreen(
         if (keyword.trim().length > 0) {
             delay(300) // Debounce 300ms
             viewModel.getAutocompleteSuggestions(keyword)
-            showSuggestions = suggestions.isNotEmpty()
+            showSuggestions = true
         } else {
             showSuggestions = false
         }
@@ -75,148 +76,140 @@ fun SearchScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    // Search input field with autocomplete
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = keyword,
-                            onValueChange = {
-                                keyword = it
-                                showKeywordError = false
-                            },
-                            placeholder = {
-                                Text(
-                                    "Search events...",
-                                    color = Color.Gray,
-                                    fontSize = 16.sp
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                focusedBorderColor = Color.Transparent,
-                                unfocusedBorderColor = Color.Transparent
-                            ),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
-                            keyboardOptions = KeyboardOptions(
-                                autoCorrect = false,
-                                keyboardType = KeyboardType.Text,
-                                imeAction = ImeAction.Search
-                            ),
-                            trailingIcon = {
-                                if (keyword.isNotEmpty()) {
-                                    IconButton(
-                                        onClick = {
-                                            keyword = ""
-                                            showSuggestions = false
-                                        },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Clear,
-                                            contentDescription = "Clear",
-                                            tint = Color.Gray,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+            Column {
+                TopAppBar(
+                    title = {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            TextField(
+                                value = keyword,
+                                onValueChange = {
+                                    keyword = it
+                                    showKeywordError = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text("Search events...") },
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent
+                                ),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Search
+                                ),
+                                trailingIcon = {
+                                    if (keyword.isNotEmpty()) {
+                                        IconButton(
+                                            onClick = {
+                                                keyword = ""
+                                                showSuggestions = false
+                                            },
+                                            modifier = Modifier.size(24.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Clear,
+                                                contentDescription = "Clear",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
 
-                        // Autocomplete dropdown
-                        if (showSuggestions && suggestions.isNotEmpty()) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 56.dp),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                LazyColumn(
+                            // Autocomplete dropdown
+                            if (showSuggestions && suggestions.isNotEmpty()) {
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(max = 200.dp)
+                                        .padding(top = 56.dp),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                                    shape = RoundedCornerShape(4.dp)
                                 ) {
-                                    // First item: user's input
-                                    item {
-                                        Text(
-                                            text = keyword,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    showSuggestions = false
-                                                }
-                                                .padding(12.dp),
-                                            fontSize = 14.sp
-                                        )
-                                        HorizontalDivider()
-                                    }
+                                    LazyColumn(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 200.dp)
+                                    ) {
+                                        // First item: user's input
+                                        item {
+                                            Text(
+                                                text = keyword,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        showSuggestions = false
+                                                    }
+                                                    .padding(12.dp),
+                                                fontSize = 14.sp
+                                            )
+                                            HorizontalDivider()
+                                        }
 
-                                    // API suggestions
-                                    items(suggestions.filter {
-                                        it.lowercase() != keyword.lowercase()
-                                    }) { suggestion ->
-                                        Text(
-                                            text = suggestion,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    keyword = suggestion
-                                                    showSuggestions = false
-                                                }
-                                                .padding(12.dp),
-                                            fontSize = 14.sp,
-                                            color = Color.Gray
-                                        )
-                                        HorizontalDivider()
+                                        // API suggestions
+                                        items(suggestions.filter {
+                                            it.lowercase() != keyword.lowercase()
+                                        }) { suggestion ->
+                                            Text(
+                                                text = suggestion,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        keyword = suggestion
+                                                        showSuggestions = false
+                                                    }
+                                                    .padding(12.dp),
+                                                fontSize = 14.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            HorizontalDivider()
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        // Validate and perform search
-                        showKeywordError = keyword.isBlank()
-                        showLocationError = !useCurrentLocation && manualLocation.isBlank()
-
-                        if (!showKeywordError && !showLocationError) {
-                            val searchParams = SearchParams(
-                                keyword = keyword.trim(),
-                                distance = distance,
-                                category = categorySegmentIds[selectedCategory] ?: "",
-                                autoDetect = useCurrentLocation,
-                                location = if (!useCurrentLocation) manualLocation else "",
-                                latitude = null,
-                                longitude = null
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
                             )
-                            viewModel.searchEvents(searchParams)
-                            onNavigateToResults()
                         }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = Color.Red
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFE3F2FD)
+                    },
+                    actions = {
+                        IconButton(onClick = {
+                            // Validate and perform search
+                            showKeywordError = keyword.isBlank()
+                            showLocationError = !useCurrentLocation && manualLocation.isBlank()
+
+                            if (!showKeywordError && !showLocationError) {
+                                val searchParams = SearchParams(
+                                    keyword = keyword.trim(),
+                                    distance = distance,
+                                    category = categorySegmentIds[selectedCategory] ?: "",
+                                    autoDetect = useCurrentLocation,
+                                    location = if (!useCurrentLocation) manualLocation else "",
+                                    latitude = null,
+                                    longitude = null
+                                )
+                                viewModel.searchEvents(searchParams)
+                                onNavigateToResults()
+                            }
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search",
+                                tint = Color.Red
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
                 )
-            )
+            }
         }
     ) { paddingValues ->
         Column(
@@ -245,97 +238,47 @@ fun SearchScreen(
                 // Location selector
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable {
-                            useCurrentLocation = !useCurrentLocation
-                        }
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = "Location",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (useCurrentLocation) "Current Location" else "Other",
-                        fontSize = 16.sp,
-                        color = Color.Black
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Dropdown",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
+
+                    Text(
+                        text = if (useCurrentLocation) "Current Location" else manualLocation.ifEmpty { "Enter location" },
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
-                // Distance controls
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    IconButton(
-                        onClick = { if (distance > 1) distance-- },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Remove,
-                            contentDescription = "Decrease distance",
-                            tint = Color.Gray
-                        )
-                    }
+                Spacer(modifier = Modifier.width(16.dp))
 
-                    Text(
-                        text = distance.toString(),
-                        fontSize = 18.sp,
-                        color = Color.Black,
-                        modifier = Modifier.widthIn(min = 24.dp),
-                        textAlign = TextAlign.Center
+                // Distance selector
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowLeft,
+                        contentDescription = "Decrease",
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    IconButton(
-                        onClick = { distance++ },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Increase distance",
-                            tint = Color.Gray
-                        )
-                    }
+                    Text(
+                        text = "$distance",
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
 
                     Text(
                         text = "mi",
-                        fontSize = 16.sp,
-                        color = Color.Black
-                    )
-                }
-            }
-
-            // Manual location input
-            if (!useCurrentLocation) {
-                OutlinedTextField(
-                    value = manualLocation,
-                    onValueChange = {
-                        manualLocation = it
-                        showLocationError = false
-                    },
-                    placeholder = { Text("Enter location") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    isError = showLocationError,
-                    singleLine = true
-                )
-                if (showLocationError) {
-                    Text(
-                        text = "Location is required",
-                        color = Color.Red,
                         fontSize = 14.sp,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -343,9 +286,8 @@ fun SearchScreen(
             // Category tabs
             ScrollableTabRow(
                 selectedTabIndex = selectedCategory,
-                containerColor = Color.Transparent,
-                edgePadding = 0.dp,
-                modifier = Modifier.fillMaxWidth()
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
                 categories.forEachIndexed { index, category ->
                     Tab(
@@ -354,40 +296,35 @@ fun SearchScreen(
                         text = {
                             Text(
                                 text = category,
-                                fontSize = 14.sp,
-                                color = if (selectedCategory == index) Color.Blue else Color.Gray
+                                fontSize = 14.sp
                             )
                         }
                     )
                 }
             }
 
-            HorizontalDivider()
-
-            // Results area
+            // "No events found" placeholder
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
                 contentAlignment = Alignment.TopCenter
             ) {
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFE3F2FD)
-                    ),
+                        .padding(top = 32.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = "No events found",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        textAlign = TextAlign.Center,
+                            .padding(vertical = 40.dp),
                         fontSize = 16.sp,
-                        color = Color.Gray
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
