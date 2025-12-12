@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.csci571.hw4.eventsaround.data.model.Event
 import com.csci571.hw4.eventsaround.ui.viewmodel.SearchViewModel
+import com.csci571.hw4.eventsaround.ui.viewmodel.ResultsViewModel
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,15 +37,19 @@ import java.util.*
 fun ResultsScreen(
     onNavigateBack: () -> Unit,
     onEventClick: (String) -> Unit,
-    viewModel: SearchViewModel = viewModel()
+    searchViewModel: SearchViewModel = viewModel(),
+    resultsViewModel: ResultsViewModel = viewModel()  // Add ResultsViewModel for favorite management
 ) {
-    // Collect states from ViewModel
-    val searchResults by viewModel.searchResults.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error by viewModel.error.collectAsState()
+    // Collect states from SearchViewModel
+    val searchResults by searchViewModel.searchResults.collectAsState()
+    val isLoading by searchViewModel.isLoading.collectAsState()
+    val error by searchViewModel.error.collectAsState()
+
+    // Collect favorite states from ResultsViewModel
+    val favoriteStates by resultsViewModel.favoriteStates.collectAsState()
 
     // Get last search params from ViewModel
-    val lastSearchParams = viewModel.getLastSearchParams()
+    val lastSearchParams = searchViewModel.getLastSearchParams()
 
     // Category tabs state
     val categories = listOf("All", "Music", "Sports", "Arts & Theatre", "Film", "Miscellaneous")
@@ -53,6 +58,11 @@ fun ResultsScreen(
     // Distance state for display
     var distance by remember { mutableIntStateOf(lastSearchParams?.distance ?: 10) }
     var useCurrentLocation by remember { mutableStateOf(lastSearchParams?.autoDetect ?: true) }
+
+    // Initialize favorite states when search results change
+    LaunchedEffect(searchResults) {
+        resultsViewModel.initializeFavoriteStates(searchResults)
+    }
 
     // Filter results based on selected category
     val filteredResults = remember(searchResults, selectedCategory) {
@@ -123,43 +133,27 @@ fun ResultsScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (useCurrentLocation) "Current Location" else "Other",
+                            text = if (useCurrentLocation) "Current Location" else (lastSearchParams?.location ?: "Location"),
                             fontSize = 14.sp,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = "Dropdown",
-                            tint = Color.Gray,
-                            modifier = Modifier.size(20.dp)
+                            color = Color.Gray
                         )
                     }
 
-                    // Distance controls with swap icon
+                    // Distance display
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Swap",
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Distance",
                             tint = Color.Gray,
                             modifier = Modifier.size(20.dp)
                         )
-
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = distance.toString(),
-                            fontSize = 16.sp,
-                            color = Color.Black,
-                            modifier = Modifier.widthIn(min = 20.dp),
-                            textAlign = TextAlign.Center
-                        )
-
-                        Text(
-                            text = "mi",
+                            text = "$distance mi",
                             fontSize = 14.sp,
-                            color = Color.Black
+                            color = Color.Gray
                         )
                     }
                 }
@@ -168,8 +162,7 @@ fun ResultsScreen(
                 ScrollableTabRow(
                     selectedTabIndex = selectedCategory,
                     containerColor = Color(0xFFE3F2FD),
-                    edgePadding = 0.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    edgePadding = 0.dp
                 ) {
                     categories.forEachIndexed { index, category ->
                         Tab(
@@ -179,15 +172,12 @@ fun ResultsScreen(
                                 Text(
                                     text = category,
                                     fontSize = 14.sp,
-                                    color = if (selectedCategory == index) Color(0xFF1976D2) else Color.Gray,
-                                    fontWeight = if (selectedCategory == index) FontWeight.SemiBold else FontWeight.Normal
+                                    fontWeight = if (selectedCategory == index) FontWeight.Bold else FontWeight.Normal
                                 )
                             }
                         )
                     }
                 }
-
-                HorizontalDivider(color = Color(0xFFBDBDBD), thickness = 1.dp)
             }
         }
     ) { paddingValues ->
@@ -195,13 +185,11 @@ fun ResultsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
         ) {
             when {
                 isLoading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = Color(0xFF1976D2)
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
 
@@ -214,45 +202,38 @@ fun ResultsScreen(
                     ) {
                         Text(
                             text = "Error: $error",
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = TextAlign.Center
+                            color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.clearError() }) {
+                        Button(onClick = { searchViewModel.clearError() }) {
                             Text("Dismiss")
                         }
                     }
                 }
 
                 filteredResults.isEmpty() -> {
-                    Card(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFFE3F2FD)
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "No events found",
-                            modifier = Modifier.padding(32.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                    Text(
+                        text = "No events found",
+                        modifier = Modifier.align(Alignment.Center),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Gray
+                    )
                 }
 
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(0.dp),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         items(filteredResults) { event ->
                             EventResultCard(
                                 event = event,
-                                onClick = { onEventClick(event.id) }
+                                isFavorite = favoriteStates[event.id] ?: false,
+                                onEventClick = { onEventClick(event.id) },
+                                onFavoriteClick = {
+                                    resultsViewModel.toggleFavorite(event)
+                                }
                             )
                         }
                     }
@@ -263,78 +244,75 @@ fun ResultsScreen(
 }
 
 /**
- * Event card component with large image on top
+ * Event card component for search results with favorite button
  */
 @Composable
 fun EventResultCard(
     event: Event,
-    onClick: () -> Unit
+    isFavorite: Boolean,
+    onEventClick: () -> Unit,
+    onFavoriteClick: () -> Unit
 ) {
-    var isFavorite by remember { mutableStateOf(false) }
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onEventClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFF2C3E50)
+            containerColor = Color.White
         )
     ) {
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Large event image at the top
+            // Event image
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
             ) {
                 AsyncImage(
-                    model = event.imageUrl,
-                    contentDescription = "Event image",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                    model = event.images?.firstOrNull()?.url ?: "",
+                    contentDescription = event.name,
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
 
-                // Category badge on top left
-                if (event.category.isNotEmpty()) {
-                    Surface(
-                        color = getCategoryColor(event.category),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier
-                            .padding(12.dp)
-                            .align(Alignment.TopStart)
-                    ) {
-                        Text(
-                            text = event.category,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-
-                // Date and time badge on top right
+                // Category badge - top left
                 Surface(
-                    color = Color.White.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(4.dp),
                     modifier = Modifier
                         .padding(12.dp)
-                        .align(Alignment.TopEnd)
+                        .align(Alignment.TopStart),
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = formatDateTime(event.date, event.time),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        style = MaterialTheme.typography.labelMedium,
+                        text = event.category,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontSize = 10.sp,
                         color = Color.Black,
-                        fontSize = 12.sp
+                        fontWeight = FontWeight.Medium
                     )
+                }
+
+                // Date & Time badge - top right
+                event.dates?.start?.let { start ->
+                    Surface(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .align(Alignment.TopEnd),
+                        color = Color.White,
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            text = formatDateTime(start.localDate, start.localTime),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            fontSize = 10.sp,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
@@ -363,7 +341,7 @@ fun EventResultCard(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = event.venue.ifEmpty { "Venue TBA" },
+                        text = event.embedded?.venues?.firstOrNull()?.name ?: "Venue TBA",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Gray,
                         maxLines = 1,
@@ -374,7 +352,7 @@ fun EventResultCard(
 
                 // Favorite star button
                 IconButton(
-                    onClick = { isFavorite = !isFavorite },
+                    onClick = onFavoriteClick,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
@@ -392,8 +370,10 @@ fun EventResultCard(
 /**
  * Format date and time to display format
  */
-private fun formatDateTime(dateString: String, timeString: String?): String {
+private fun formatDateTime(dateString: String?, timeString: String?): String {
     return try {
+        if (dateString.isNullOrEmpty()) return "Date TBA"
+
         val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val date = inputDateFormat.parse(dateString)
         val outputDateFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
@@ -410,19 +390,5 @@ private fun formatDateTime(dateString: String, timeString: String?): String {
         }
     } catch (e: Exception) {
         "$dateString ${timeString ?: ""}"
-    }
-}
-
-/**
- * Get category color based on category name
- */
-private fun getCategoryColor(category: String): Color {
-    return when (category.lowercase()) {
-        "music" -> Color(0xFF9C27B0)
-        "sports" -> Color(0xFF4CAF50)
-        "arts & theatre", "arts" -> Color(0xFFFF5722)
-        "film" -> Color(0xFF2196F3)
-        "miscellaneous" -> Color(0xFF607D8B)
-        else -> Color(0xFF757575)
     }
 }

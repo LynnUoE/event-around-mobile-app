@@ -22,7 +22,11 @@ data class Event(
     val images: List<EventImage>? = null,
 
     @SerializedName("priceRanges")
-    val priceRanges: List<PriceRange>? = null
+    val priceRanges: List<PriceRange>? = null,
+
+    // Timestamp when event was added to favorites (not from API)
+    @SerializedName("favoritedAt")
+    val favoritedAt: Long? = null
 ) {
     // Helper properties for easier access
     val date: String
@@ -116,11 +120,9 @@ data class Classification(
     val genre: Genre?
 )
 
-
 /**
  * API Response wrapper
  */
-
 data class EmbeddedEvents(
     @SerializedName("events")
     val events: List<Event>

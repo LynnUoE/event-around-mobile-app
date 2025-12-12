@@ -1,9 +1,7 @@
 package com.csci571.hw4.eventsaround.ui.navigation
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -12,6 +10,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.csci571.hw4.eventsaround.ui.screens.*
 import com.csci571.hw4.eventsaround.ui.viewmodel.SearchViewModel
+import com.csci571.hw4.eventsaround.ui.viewmodel.ResultsViewModel
+import com.csci571.hw4.eventsaround.ui.viewmodel.HomeViewModel
 
 /**
  * Main navigation component - NO BOTTOM NAVIGATION BAR
@@ -23,6 +23,8 @@ fun AppNavigation() {
 
     // Share the same ViewModel instance across screens
     val searchViewModel: SearchViewModel = viewModel()
+    val resultsViewModel: ResultsViewModel = viewModel()
+    val homeViewModel: HomeViewModel = viewModel()
 
     // No Scaffold with bottom bar - just pure navigation
     NavHost(
@@ -31,6 +33,11 @@ fun AppNavigation() {
     ) {
         // Favorites/Home Screen (START DESTINATION)
         composable(Screen.Home.route) {
+            // Reload favorites when navigating back to home screen
+            LaunchedEffect(Unit) {
+                homeViewModel.loadFavorites()
+            }
+
             HomeScreen(
                 onEventClick = { eventId ->
                     navController.navigate(Screen.Details.createRoute(eventId))
@@ -38,7 +45,8 @@ fun AppNavigation() {
                 onSearchClick = {
                     // Navigate to search screen when search icon is clicked
                     navController.navigate(Screen.Search.route)
-                }
+                },
+                viewModel = homeViewModel
             )
         }
 
@@ -65,7 +73,8 @@ fun AppNavigation() {
                 onEventClick = { eventId ->
                     navController.navigate(Screen.Details.createRoute(eventId))
                 },
-                viewModel = searchViewModel
+                searchViewModel = searchViewModel,
+                resultsViewModel = resultsViewModel
             )
         }
 
@@ -78,7 +87,8 @@ fun AppNavigation() {
                 }
             )
         ) { backStackEntry ->
-            val eventId = backStackEntry.arguments?.getString("eventId") ?: ""
+            val eventId = backStackEntry.arguments?.getString("eventId") ?: return@composable
+
             DetailsScreen(
                 eventId = eventId,
                 onNavigateBack = {
@@ -90,7 +100,7 @@ fun AppNavigation() {
 }
 
 /**
- * Screen routes
+ * Navigation routes
  */
 sealed class Screen(val route: String) {
     object Home : Screen("home")

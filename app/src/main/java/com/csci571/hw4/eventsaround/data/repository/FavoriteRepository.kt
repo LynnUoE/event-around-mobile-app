@@ -11,7 +11,6 @@ import com.csci571.hw4.eventsaround.data.model.Event
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 
 // Extension to create DataStore
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "event_favorites")
@@ -64,7 +63,7 @@ class FavoritesRepository private constructor(private val context: Context) {
     }
 
     /**
-     * Add event to favorites
+     * Add event to favorites with timestamp
      */
     suspend fun addFavorite(event: Event) {
         try {
@@ -77,8 +76,13 @@ class FavoritesRepository private constructor(private val context: Context) {
                     return@edit
                 }
 
+                // Create event with favoritedAt timestamp
+                val eventWithTimestamp = event.copy(
+                    favoritedAt = System.currentTimeMillis()
+                )
+
                 // Add to list
-                currentFavorites.add(event)
+                currentFavorites.add(eventWithTimestamp)
 
                 // Save to DataStore
                 val json = gson.toJson(currentFavorites)
