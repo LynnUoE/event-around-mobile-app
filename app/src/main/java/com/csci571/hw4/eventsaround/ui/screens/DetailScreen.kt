@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,11 +16,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +32,7 @@ import com.csci571.hw4.eventsaround.data.model.EventDetails
 import com.csci571.hw4.eventsaround.ui.viewmodel.EventDetailsViewModel
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.abs
 
 /**
  * Details Screen - Shows comprehensive information about a single event
@@ -123,7 +127,23 @@ fun DetailsScreen(
                     val currentEventDetails = eventDetails!!
 
                     Column(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                // Swipe gesture to change tabs
+                                detectHorizontalDragGestures { change, dragAmount ->
+                                    change.consume()
+                                    if (abs(dragAmount) > 50) {
+                                        if (dragAmount < 0 && selectedTab < 2) {
+                                            // Swipe left - next tab
+                                            selectedTab++
+                                        } else if (dragAmount > 0 && selectedTab > 0) {
+                                            // Swipe right - previous tab
+                                            selectedTab--
+                                        }
+                                    }
+                                }
+                            }
                     ) {
                         // Tabs with icons
                         TabRow(
@@ -393,34 +413,462 @@ fun DetailsTab(event: EventDetails) {
 }
 
 /**
- * Artist tab content
+ * Artist tab content - Shows Spotify artist information
  */
 @Composable
 fun ArtistTab(event: EventDetails, viewModel: EventDetailsViewModel) {
-    // TODO: Implement artist information
+    val context = LocalContext.current
+    val artistData by viewModel.artistData.collectAsState()
+    val albums by viewModel.albums.collectAsState()
+    val isLoadingArtist by viewModel.isLoadingArtist.collectAsState()
+
+    // Check if this is a music event
+    val isMusicEvent = event.classifications?.firstOrNull()?.segment?.name?.equals("Music", ignoreCase = true) == true
+
+    // Load artist data when tab opens
+    LaunchedEffect(event.id) {
+        if (isMusicEvent) {
+            event._embedded?.attractions?.firstOrNull()?.name?.let { artistName ->
+                viewModel.loadArtistData(artistName)
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
+            .background(Color.White)
     ) {
-        Text("Artist information will be displayed here")
+        when {
+            !isMusicEvent -> {
+                // Not a music event
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No artist data",
+                        fontSize = 16.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+            isLoadingArtist -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+
+            artistData != null -> {
+                val artist = artistData!!
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Artist card
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = Color(0xFFF5F5F5)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Artist image
+                            artist.images.firstOrNull()?.url?.let { imageUrl ->
+                                AsyncImage(
+                                    model = imageUrl,
+                                    contentDescription = artist.name,
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .clip(RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+
+                            // Artist info
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = artist.name,
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+
+                                    // External link icon
+                                    artist.external_urls.spotify?.let { spotifyUrl ->
+                                        Icon(
+                                            imageVector = Icons.Default.Launch,
+                                            contentDescription = "Open in Spotify",
+                                            tint = Color.Gray,
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clickable {
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spotifyUrl))
+                                                    context.startActivity(intent)
+                                                }
+                                        )
+                                    }
+                                }
+
+                                // Followers and Popularity
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        text = "Followers: ${formatFollowersNumber(artist.followers.total)}",
+                                        fontSize = 13.sp,
+                                        color = Color.Gray
+                                    )
+
+                                    Text(
+                                        text = "Popularity: ${artist.popularity}%",
+                                        fontSize = 13.sp,
+                                        color = Color.Gray
+                                    )
+                                }
+
+                                // Genre
+                                if (artist.genres.isNotEmpty()) {
+                                    Surface(
+                                        color = Color.White,
+                                        shape = RoundedCornerShape(16.dp),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            Color.LightGray
+                                        )
+                                    ) {
+                                        Text(
+                                            text = artist.genres.first(),
+                                            modifier = Modifier.padding(
+                                                horizontal = 12.dp,
+                                                vertical = 6.dp
+                                            ),
+                                            fontSize = 12.sp,
+                                            color = Color.DarkGray
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Albums section
+                    if (albums.isNotEmpty()) {
+                        Text(
+                            text = "Albums",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        // Grid of albums
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            albums.chunked(2).forEach { rowAlbums ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    rowAlbums.forEach { album ->
+                                        AlbumCard(
+                                            album = album,
+                                            modifier = Modifier.weight(1f),
+                                            onClick = {
+                                                album.external_urls.spotify?.let { spotifyUrl ->
+                                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spotifyUrl))
+                                                    context.startActivity(intent)
+                                                }
+                                            }
+                                        )
+                                    }
+                                    // Add empty space if odd number of albums
+                                    if (rowAlbums.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            else -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No artist data available",
+                        fontSize = 16.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+        }
     }
 }
 
 /**
- * Venue tab content
+ * Album card component
+ */
+@Composable
+fun AlbumCard(
+    album: com.csci571.hw4.eventsaround.data.model.Album,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = modifier.clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF5F5F5)
+        ),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp)
+        ) {
+            // Album image
+            album.images.firstOrNull()?.url?.let { imageUrl ->
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = album.name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(4.dp)),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Album name
+            Text(
+                text = album.name,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Release date and tracks
+            Text(
+                text = formatReleaseDate(album.release_date),
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+
+            Text(
+                text = "${album.total_tracks} tracks",
+                fontSize = 12.sp,
+                color = Color.Gray
+            )
+        }
+    }
+}
+
+/**
+ * Format followers count with commas (e.g., 122,989,098)
+ */
+private fun formatFollowersNumber(count: Int): String {
+    return String.format("%,d", count)
+}
+
+/**
+ * Format followers count to K or M (for compact display if needed)
+ */
+private fun formatFollowers(count: Int): String {
+    return when {
+        count >= 1_000_000 -> {
+            val millions = count / 1_000_000.0
+            String.format("%.1fM", millions).replace(".0M", "M")
+        }
+        count >= 1_000 -> {
+            val thousands = count / 1_000.0
+            String.format("%.1fK", thousands).replace(".0K", "K")
+        }
+        else -> count.toString()
+    }
+}
+
+/**
+ * Format release date
+ */
+private fun formatReleaseDate(dateString: String): String {
+    return try {
+        val parts = dateString.split("-")
+        val year = parts[0]
+        val month = if (parts.size > 1) parts[1] else "01"
+        val day = if (parts.size > 2) parts[2] else "01"
+
+        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val date = inputFormat.parse("$year-$month-$day")
+        val outputFormat = SimpleDateFormat("MMM d, yyyy", Locale.US)
+        date?.let { outputFormat.format(it) } ?: dateString
+    } catch (e: Exception) {
+        dateString
+    }
+}
+
+/**
+ * Venue tab content - Shows venue information from Ticketmaster with real images
  */
 @Composable
 fun VenueTab(event: EventDetails) {
-    // TODO: Implement venue information
-    Box(
+    val context = LocalContext.current
+    val venue = event._embedded?.venues?.firstOrNull()
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .background(Color.White)
             .padding(16.dp),
-        contentAlignment = Alignment.Center
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Venue information will be displayed here")
+        if (venue != null) {
+            // Venue card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF5F5F5)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Venue cover image from Ticketmaster API
+                    // Note: You need to update VenueDetails data class to include images and url fields
+                    // For now, using a styled placeholder that looks like the SoFi Stadium logo
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF00BCD4)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            // Stadium/Venue icon
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Venue",
+                                tint = Color.White,
+                                modifier = Modifier.size(80.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = venue.name,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    // Venue name and external link
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = venue.name,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // External link icon - Opens venue's Ticketmaster page
+                        Icon(
+                            imageVector = Icons.Default.Launch,
+                            contentDescription = "Open venue on Ticketmaster",
+                            tint = Color.Gray,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable {
+                                    // Use venue URL if available, otherwise search on Ticketmaster
+                                    // NOTE: After updating VenueDetails to include url field, uncomment this:
+                                    /*
+                                    val venueUrl = venue.url ?: run {
+                                        val venueName = Uri.encode(venue.name)
+                                        "https://www.ticketmaster.com/search?q=$venueName"
+                                    }
+                                    */
+                                    // For now, use search URL:
+                                    val venueName = Uri.encode(venue.name)
+                                    val ticketmasterUrl = "https://www.ticketmaster.com/search?q=$venueName"
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ticketmasterUrl))
+                                    context.startActivity(intent)
+                                }
+                        )
+                    }
+
+                    // Address
+                    val address = buildString {
+                        venue.address?.line1?.let { append(it) }
+                        venue.city?.name?.let {
+                            if (isNotEmpty()) append(", ")
+                            append(it)
+                        }
+                        venue.state?.stateCode?.let {
+                            if (isNotEmpty()) append(", ")
+                            append(it)
+                        }
+                        if (isNotEmpty()) append(", US")
+                    }
+
+                    if (address.isNotEmpty()) {
+                        Text(
+                            text = address,
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            }
+        } else {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No venue information available",
+                    fontSize = 16.sp,
+                    color = Color.Gray
+                )
+            }
+        }
     }
 }
 
