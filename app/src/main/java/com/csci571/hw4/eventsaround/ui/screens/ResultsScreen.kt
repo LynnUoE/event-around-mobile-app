@@ -1,13 +1,13 @@
 package com.csci571.hw4.eventsaround.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,9 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.csci571.hw4.eventsaround.data.model.Event
@@ -27,7 +29,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * Results Screen - Displays search results
+ * Results Screen - Displays search results with category tabs and filtering
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,33 +43,165 @@ fun ResultsScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
 
+    // Get last search params from ViewModel
+    val lastSearchParams = viewModel.getLastSearchParams()
+
+    // Category tabs state
+    val categories = listOf("All", "Music", "Sports", "Arts & Theatre", "Film", "Miscellaneous")
+    var selectedCategory by remember { mutableIntStateOf(0) }
+
+    // Distance state for display
+    var distance by remember { mutableIntStateOf(lastSearchParams?.distance ?: 10) }
+    var useCurrentLocation by remember { mutableStateOf(lastSearchParams?.autoDetect ?: true) }
+
+    // Filter results based on selected category
+    val filteredResults = remember(searchResults, selectedCategory) {
+        if (selectedCategory == 0) {
+            searchResults
+        } else {
+            val categoryName = categories[selectedCategory]
+            searchResults.filter { event ->
+                event.category.equals(categoryName, ignoreCase = true)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Search Results") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+            Column {
+                // Top bar with back button, search keyword, and search icon
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = lastSearchParams?.keyword ?: "",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { /* Search action */ }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Search"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color(0xFFE3F2FD)
+                    )
+                )
+
+                // Location and Distance row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFE3F2FD))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Location selector
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "Location",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (useCurrentLocation) "Current Location" else "Other",
+                            fontSize = 14.sp,
+                            color = Color.Black
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Dropdown",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFE3F2FD)
-                )
-            )
+
+                    // Distance controls with swap icon
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Swap",
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+
+                        Text(
+                            text = distance.toString(),
+                            fontSize = 16.sp,
+                            color = Color.Black,
+                            modifier = Modifier.widthIn(min = 20.dp),
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = "mi",
+                            fontSize = 14.sp,
+                            color = Color.Black
+                        )
+                    }
+                }
+
+                // Category tabs
+                ScrollableTabRow(
+                    selectedTabIndex = selectedCategory,
+                    containerColor = Color(0xFFE3F2FD),
+                    edgePadding = 0.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    categories.forEachIndexed { index, category ->
+                        Tab(
+                            selected = selectedCategory == index,
+                            onClick = { selectedCategory = index },
+                            text = {
+                                Text(
+                                    text = category,
+                                    fontSize = 14.sp,
+                                    color = if (selectedCategory == index) Color(0xFF1976D2) else Color.Gray,
+                                    fontWeight = if (selectedCategory == index) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            }
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFBDBDBD), thickness = 1.dp)
+            }
         }
     ) { paddingValues ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .background(Color.White)
         ) {
             when {
                 isLoading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color(0xFF1976D2)
                     )
                 }
 
@@ -90,7 +224,7 @@ fun ResultsScreen(
                     }
                 }
 
-                searchResults.isEmpty() -> {
+                filteredResults.isEmpty() -> {
                     Card(
                         modifier = Modifier
                             .align(Alignment.Center)
@@ -112,10 +246,10 @@ fun ResultsScreen(
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        contentPadding = PaddingValues(0.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        items(searchResults) { event ->
+                        items(filteredResults) { event ->
                             EventResultCard(
                                 event = event,
                                 onClick = { onEventClick(event.id) }
@@ -128,6 +262,9 @@ fun ResultsScreen(
     }
 }
 
+/**
+ * Event card component with large image on top
+ */
 @Composable
 fun EventResultCard(
     event: Event,
@@ -138,85 +275,123 @@ fun EventResultCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
             .clickable(onClick = onClick),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF2C3E50)
+        )
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            AsyncImage(
-                model = event.imageUrl,
-                contentDescription = "Event image",
+            // Large event image at the top
+            Box(
                 modifier = Modifier
-                    .size(100.dp)
-                    .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.SpaceBetween
+                    .fillMaxWidth()
+                    .height(200.dp)
             ) {
-                Text(
-                    text = event.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                AsyncImage(
+                    model = event.imageUrl,
+                    contentDescription = "Event image",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                    contentScale = ContentScale.Crop
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = event.venue.ifEmpty { "Venue TBA" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = formatDateTime(event.date, event.time),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // Category badge on top left
                 if (event.category.isNotEmpty()) {
                     Surface(
                         color = getCategoryColor(event.category),
                         shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.wrapContentWidth()
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .align(Alignment.TopStart)
                     ) {
                         Text(
                             text = event.category,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
+
+                // Date and time badge on top right
+                Surface(
+                    color = Color.White.copy(alpha = 0.95f),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .align(Alignment.TopEnd)
+                ) {
+                    Text(
+                        text = formatDateTime(event.date, event.time),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.Black,
+                        fontSize = 12.sp
+                    )
+                }
             }
 
-            IconButton(onClick = { isFavorite = !isFavorite }) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                    contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
-                    tint = if (isFavorite) Color(0xFFFFD700) else Color.Gray
-                )
+            // Event details section at bottom
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = event.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = Color.Black,
+                        fontSize = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = event.venue.ifEmpty { "Venue TBA" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 14.sp
+                    )
+                }
+
+                // Favorite star button
+                IconButton(
+                    onClick = { isFavorite = !isFavorite },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        contentDescription = if (isFavorite) "Remove from favorites" else "Add to favorites",
+                        tint = if (isFavorite) Color(0xFFFFD700) else Color.Gray,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * Format date and time to display format
+ */
 private fun formatDateTime(dateString: String, timeString: String?): String {
     return try {
         val inputDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -238,6 +413,9 @@ private fun formatDateTime(dateString: String, timeString: String?): String {
     }
 }
 
+/**
+ * Get category color based on category name
+ */
 private fun getCategoryColor(category: String): Color {
     return when (category.lowercase()) {
         "music" -> Color(0xFF9C27B0)
@@ -245,6 +423,6 @@ private fun getCategoryColor(category: String): Color {
         "arts & theatre", "arts" -> Color(0xFFFF5722)
         "film" -> Color(0xFF2196F3)
         "miscellaneous" -> Color(0xFF607D8B)
-        else -> Color.Gray
+        else -> Color(0xFF757575)
     }
 }
