@@ -135,6 +135,12 @@ data class VenueDetails(
     @SerializedName("name")
     val name: String,
 
+    @SerializedName("url")
+    val url: String? = null,  // ✅ Add Ticketmaster URL for venue
+
+    @SerializedName("images")
+    val images: List<EventImage>? = null,  // ✅ Add venue images
+
     @SerializedName("address")
     val address: VenueAddress?,
 
@@ -144,6 +150,9 @@ data class VenueDetails(
     @SerializedName("state")
     val state: VenueState?,  // ✅ VenueState is defined in Event.kt
 
+    @SerializedName("postalCode")
+    val postalCode: String? = null,  // ✅ Add postal code
+
     @SerializedName("location")
     val location: VenueLocation?  // ✅ VenueLocation is defined in Event.kt
 )
@@ -152,7 +161,6 @@ data class VenueAddress(
     @SerializedName("line1")
     val line1: String?
 )
-
 // ========================================
 // Note: VenueCity, VenueState, VenueLocation are NOT defined here
 // They are defined in Event.kt and shared between both files

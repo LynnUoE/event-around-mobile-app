@@ -34,6 +34,9 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.math.abs
 
+
+import coil.request.ImageRequest
+
 /**
  * Details Screen - Shows comprehensive information about a single event
  */
@@ -732,7 +735,8 @@ private fun formatReleaseDate(dateString: String): String {
 }
 
 /**
- * Venue tab content - Shows venue information from Ticketmaster with real images
+ * Venue tab content - Shows venue information with real images and Ticketmaster link
+ * Only displays external link and image when venue has valid URL from Ticketmaster
  */
 @Composable
 fun VenueTab(event: EventDetails) {
@@ -748,6 +752,9 @@ fun VenueTab(event: EventDetails) {
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         if (venue != null) {
+            // Check if venue has valid URL (indicates it's a real venue from Ticketmaster)
+            val hasValidVenueInfo = !venue.url.isNullOrEmpty()
+
             // Venue card
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -760,43 +767,61 @@ fun VenueTab(event: EventDetails) {
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Venue cover image from Ticketmaster API
-                    // Note: You need to update VenueDetails data class to include images and url fields
-                    // For now, using a styled placeholder that looks like the SoFi Stadium logo
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF00BCD4)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            // Stadium/Venue icon
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Venue",
-                                tint = Color.White,
-                                modifier = Modifier.size(80.dp)
+                    // Only show venue image if venue has valid URL/info
+                    if (hasValidVenueInfo) {
+                        val imageUrl = venue.images?.firstOrNull()?.url
+
+                        if (imageUrl != null) {
+                            // Display real venue image using Coil
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(imageUrl)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Venue image",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(8.dp))
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = venue.name,
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        } else {
+                            // Fallback placeholder if no image but has valid venue
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF00BCD4)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                    modifier = Modifier.padding(16.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocationOn,
+                                        contentDescription = "Venue",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(80.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = venue.name,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // Venue name and external link
+                    // Venue name and external link icon (only show link if venue has URL)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -809,48 +834,47 @@ fun VenueTab(event: EventDetails) {
                             modifier = Modifier.weight(1f)
                         )
 
-                        // External link icon - Opens venue's Ticketmaster page
-                        Icon(
-                            imageVector = Icons.Default.Launch,
-                            contentDescription = "Open venue on Ticketmaster",
-                            tint = Color.Gray,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clickable {
-                                    // Use venue URL if available, otherwise search on Ticketmaster
-                                    // NOTE: After updating VenueDetails to include url field, uncomment this:
-                                    /*
-                                    val venueUrl = venue.url ?: run {
-                                        val venueName = Uri.encode(venue.name)
-                                        "https://www.ticketmaster.com/search?q=$venueName"
+                        // Only show external link icon if venue has valid URL
+                        if (hasValidVenueInfo) {
+                            Icon(
+                                imageVector = Icons.Default.Launch,
+                                contentDescription = "Open venue on Ticketmaster",
+                                tint = Color.Gray,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .clickable {
+                                        // Use venue URL from API
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(venue.url))
+                                        context.startActivity(intent)
                                     }
-                                    */
-                                    // For now, use search URL:
-                                    val venueName = Uri.encode(venue.name)
-                                    val ticketmasterUrl = "https://www.ticketmaster.com/search?q=$venueName"
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(ticketmasterUrl))
-                                    context.startActivity(intent)
-                                }
-                        )
+                            )
+                        }
                     }
 
-                    // Address
-                    val address = buildString {
-                        venue.address?.line1?.let { append(it) }
-                        venue.city?.name?.let {
-                            if (isNotEmpty()) append(", ")
-                            append(it)
-                        }
+                    // Address - always show if available, format: line1, city, state postalCode
+                    val addressParts = mutableListOf<String>()
+
+                    venue.address?.line1?.let { addressParts.add(it) }
+
+                    val cityStateZip = buildString {
+                        venue.city?.name?.let { append(it) }
                         venue.state?.stateCode?.let {
                             if (isNotEmpty()) append(", ")
                             append(it)
                         }
-                        if (isNotEmpty()) append(", US")
+                        venue.postalCode?.let {
+                            if (isNotEmpty()) append(" ")
+                            append(it)
+                        }
                     }
 
-                    if (address.isNotEmpty()) {
+                    if (cityStateZip.isNotEmpty()) {
+                        addressParts.add(cityStateZip)
+                    }
+
+                    if (addressParts.isNotEmpty()) {
                         Text(
-                            text = address,
+                            text = addressParts.joinToString(", "),
                             fontSize = 14.sp,
                             color = Color.Gray
                         )
@@ -871,7 +895,6 @@ fun VenueTab(event: EventDetails) {
         }
     }
 }
-
 /**
  * Detail item component
  */
