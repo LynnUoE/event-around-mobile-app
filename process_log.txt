@@ -1,0 +1,1555 @@
+# Assignment 4 AI Assistance Process Log
+Student: Linxuan Chen
+
+---------------------------------------------------------------------------------------------
+ACKNOWLEDGEMENT
+
+This assignment was completed with the assistance of Claude AI (Anthropic). I used Claude AI throughout the development process to help generate code, debug issues, optimize implementations, and provide explanations for various Kotlin and Android development concepts. Specifically, Claude assisted with: setting up the Android project structure with Jetpack Compose, implementing navigation between screens, creating reusable UI components, integrating Retrofit for API calls, implementing local storage with SharedPreferences, and handling asynchronous operations with Coroutines. All AI-generated code was reviewed, tested, and modified by me to ensure correctness and compliance with assignment requirements. I take full responsibility for the final implementation and have documented the AI assistance process in the entries below as required by the course policy.
+
+---------------------------------------------------------------------------------------------
+
+Entry 1: Android Project Setup with Jetpack Compose and Navigation
+
+Prompt: "Help me set up an Android project using Kotlin and Jetpack Compose. I need a complete project structure with proper navigation between screens including SplashScreen, HomeScreen, SearchScreen, ResultsScreen, and DetailsScreen. Include all necessary dependencies for Compose, Navigation, Retrofit, and Coroutines in the build.gradle file."
+
+Issues: Starting an Android project from scratch requires proper configuration of dependencies and project structure. The assignment requires modern Android development practices using Jetpack Compose instead of traditional XML layouts. Without proper navigation setup, transitioning between screens would be difficult and error-prone. The project needs to support API calls to Ticketmaster, so Retrofit and coroutines must be configured correctly from the start. Additionally, the Material Design 3 theming system needs to be set up to ensure consistent UI across all screens.
+
+Fix: Create a new Android project in Android Studio with Kotlin support. In build.gradle.kts (Module: app), add dependencies for Jetpack Compose (compose-bom, compose-material3, compose-ui), Navigation Compose (navigation-compose), Retrofit with Gson converter (retrofit, converter-gson), Coroutines (kotlinx-coroutines-android), and Coil for image loading (coil-compose). Set compileSdk to 34 and minSdk to 24. In Navigation.kt, create a NavHost with composable routes for each screen. Define sealed class Screen with route strings for type-safe navigation. Use rememberNavController() to create navigation controller and pass it to all screen composables. In MainActivity.kt, set content using setContent { } and wrap the navigation component with the app theme.
+
+Fixed Code in build.gradle.kts (Module: app):
+```kotlin
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.yourname.eventfinder"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.yourname.eventfinder"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+    
+    buildFeatures {
+        compose = true
+    }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.1"
+    }
+    
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    // Compose BOM for version management
+    implementation(platform("androidx.compose:compose-bom:2023.10.01"))
+    
+    // Core Compose dependencies
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    
+    // Navigation for Compose
+    implementation("androidx.navigation:navigation-compose:2.7.5")
+    
+    // Retrofit for API calls
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    
+    // Coroutines for async operations
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    
+    // ViewModel and LiveData
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.6.2")
+    
+    // Coil for image loading
+    implementation("io.coil-kt:coil-compose:2.5.0")
+    
+    // Core Android dependencies
+    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("androidx.activity:activity-compose:1.8.1")
+    
+    // Testing dependencies
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    
+    // Debug dependencies
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+```
+
+Fixed Code in ui/navigation/Navigation.kt:
+```kotlin
+package com.yourname.eventfinder.ui.navigation
+
+import androidx.compose.runtime.Composable
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.yourname.eventfinder.ui.screens.*
+
+// Sealed class for type-safe navigation routes
+sealed class Screen(val route: String) {
+    object Splash : Screen("splash")
+    object Home : Screen("home")
+    object Search : Screen("search")
+    object Results : Screen("results")
+    object Details : Screen("details/{eventId}") {
+        // Helper function to create route with parameter
+        fun createRoute(eventId: String) = "details/$eventId"
+    }
+}
+
+@Composable
+fun Navigation() {
+    val navController = rememberNavController()
+    
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Splash.route
+    ) {
+        // Splash screen with auto-navigation
+        composable(route = Screen.Splash.route) {
+            SplashScreen(
+                onNavigateToHome = {
+                    navController.navigate(Screen.Home.route) {
+                        // Remove splash from back stack
+                        popUpTo(Screen.Splash.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
+        // Home/Search screen
+        composable(route = Screen.Home.route) {
+            HomeScreen(
+                onNavigateToResults = { searchParams ->
+                    navController.navigate(Screen.Results.route)
+                }
+            )
+        }
+        
+        // Search results screen
+        composable(route = Screen.Results.route) {
+            ResultsScreen(
+                onEventClick = { eventId ->
+                    navController.navigate(Screen.Details.createRoute(eventId))
+                },
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        // Event details screen with parameter
+        composable(
+            route = Screen.Details.route,
+            arguments = listOf(
+                navArgument("eventId") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getString("eventId") ?: ""
+            DetailsScreen(
+                eventId = eventId,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+    }
+}
+```
+
+Fixed Code in MainActivity.kt:
+```kotlin
+package com.yourname.eventfinder
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import com.yourname.eventfinder.ui.navigation.Navigation
+import com.yourname.eventfinder.ui.theme.EventFinderTheme
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            EventFinderTheme {
+                // Surface container using the 'background' color from the theme
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Navigation()
+                }
+            }
+        }
+    }
+}
+```
+
+Explanation: This modern Android development setup uses Jetpack Compose, which provides a declarative UI framework that simplifies UI development compared to traditional XML layouts. The Compose BOM (Bill of Materials) ensures all Compose dependencies use compatible versions, preventing version conflicts. Navigation Compose integrates seamlessly with the Compose UI framework, enabling type-safe navigation through sealed classes that prevent runtime errors from incorrect route strings. Retrofit with Gson converter handles JSON deserialization automatically, reducing boilerplate code for API responses. Coroutines provide structured concurrency for async operations without callback hell, with proper lifecycle awareness through viewModelScope. The navigation setup uses popUpTo to remove the splash screen from the back stack, preventing users from returning to it via back button. NavArguments with NavType ensure type safety when passing parameters between screens. The MainActivity uses setContent instead of setContentView, which is the Compose way of setting the root composable. The EventFinderTheme wrapper applies Material Design 3 theming consistently across all screens.
+
+---------------------------------------------------------------------------------------------
+
+Entry 2: Retrofit API Service Setup for Ticketmaster Integration
+
+Prompt: "Create a complete Retrofit setup for calling the Ticketmaster API. I need an ApiService interface with methods for searching events, getting event details, and fetching venue information. Include a RetrofitClient singleton that configures the base URL and JSON parsing. Also create data classes for Event, SearchParams, and EventDetails that match the Ticketmaster API response structure."
+
+Issues: The assignment requires integration with the Ticketmaster Discovery API to search for events and retrieve detailed information. Without proper API configuration, network calls will fail or return unparsed data. The Ticketmaster API returns complex nested JSON structures that need to be mapped to Kotlin data classes. Retrofit requires a base URL, JSON converter, and interface definitions with proper HTTP method annotations. Additionally, the API requires an API key to be passed as a query parameter with every request, which needs to be handled securely.
+
+Fix: Create a RetrofitClient singleton object that builds a Retrofit instance with the Ticketmaster base URL (https://app.ticketmaster.com/discovery/v2/). Add GsonConverterFactory for automatic JSON to Kotlin object mapping. In ApiService interface, define suspend functions for each API endpoint using @GET annotations with proper path parameters and query parameters. Create data classes in the model package that mirror the Ticketmaster API response structure, using @SerializedName annotations where JSON field names don't match Kotlin naming conventions. Use nullable types (String?, Int?) for optional fields. Add a constants file to store the API key and base URL.
+
+Fixed Code in data/remote/RetrofitClient.kt:
+```kotlin
+package com.yourname.eventfinder.data.remote
+
+import com.yourname.eventfinder.util.Constants
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+
+object RetrofitClient {
+    // Lazy initialization ensures single instance
+    private val retrofit: Retrofit by lazy {
+        Retrofit.Builder()
+            .baseUrl(Constants.TICKETMASTER_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+    
+    // API service instance
+    val apiService: ApiService by lazy {
+        retrofit.create(ApiService::class.java)
+    }
+}
+```
+
+Fixed Code in data/remote/ApiService.kt:
+```kotlin
+package com.yourname.eventfinder.data.remote
+
+import com.yourname.eventfinder.data.model.EventDetails
+import com.yourname.eventfinder.data.model.SearchResponse
+import retrofit2.Response
+import retrofit2.http.GET
+import retrofit2.http.Path
+import retrofit2.http.Query
+
+interface ApiService {
+    
+    /**
+     * Search for events with various filters
+     * @param keyword Search term for event name/description
+     * @param radius Search radius in miles
+     * @param category Event category (Music, Sports, etc.)
+     * @param location City or address to search near
+     * @param apiKey Ticketmaster API key
+     */
+    @GET("events.json")
+    suspend fun searchEvents(
+        @Query("keyword") keyword: String,
+        @Query("radius") radius: Int = 10,
+        @Query("segmentName") category: String? = null,
+        @Query("city") location: String? = null,
+        @Query("apikey") apiKey: String = Constants.TICKETMASTER_API_KEY
+    ): Response<SearchResponse>
+    
+    /**
+     * Get detailed information for a specific event
+     * @param eventId Unique event identifier
+     * @param apiKey Ticketmaster API key
+     */
+    @GET("events/{id}.json")
+    suspend fun getEventDetails(
+        @Path("id") eventId: String,
+        @Query("apikey") apiKey: String = Constants.TICKETMASTER_API_KEY
+    ): Response<EventDetails>
+    
+    /**
+     * Get autocomplete suggestions for keyword search
+     * @param keyword Partial search term
+     * @param apiKey Ticketmaster API key
+     */
+    @GET("suggest")
+    suspend fun getAutocompleteSuggestions(
+        @Query("keyword") keyword: String,
+        @Query("apikey") apiKey: String = Constants.TICKETMASTER_API_KEY
+    ): Response<List<String>>
+}
+```
+
+Fixed Code in data/model/Event.kt:
+```kotlin
+package com.yourname.eventfinder.data.model
+
+import com.google.gson.annotations.SerializedName
+
+/**
+ * Response wrapper for event search results
+ */
+data class SearchResponse(
+    @SerializedName("_embedded")
+    val embedded: EmbeddedEvents?,
+    val page: Page?
+)
+
+data class EmbeddedEvents(
+    val events: List<Event>?
+)
+
+data class Page(
+    val size: Int?,
+    val totalElements: Int?,
+    val totalPages: Int?,
+    val number: Int?
+)
+
+/**
+ * Main event data class
+ */
+data class Event(
+    val id: String,
+    val name: String,
+    val url: String?,
+    val images: List<EventImage>?,
+    
+    @SerializedName("dates")
+    val dateInfo: DateInfo?,
+    
+    @SerializedName("_embedded")
+    val embedded: EventEmbedded?,
+    
+    val classifications: List<Classification>?,
+    val priceRanges: List<PriceRange>?
+)
+
+data class EventImage(
+    val url: String,
+    val ratio: String?,
+    val width: Int?,
+    val height: Int?
+)
+
+data class DateInfo(
+    val start: DateStart?,
+    val status: DateStatus?
+)
+
+data class DateStart(
+    val localDate: String?,
+    val localTime: String?,
+    val dateTime: String?
+)
+
+data class DateStatus(
+    val code: String?
+)
+
+data class EventEmbedded(
+    val venues: List<Venue>?,
+    val attractions: List<Attraction>?
+)
+
+data class Venue(
+    val id: String,
+    val name: String,
+    val city: City?,
+    val state: State?,
+    val address: Address?,
+    val location: Location?,
+    val images: List<EventImage>?
+)
+
+data class City(
+    val name: String?
+)
+
+data class State(
+    val name: String?,
+    val stateCode: String?
+)
+
+data class Address(
+    val line1: String?
+)
+
+data class Location(
+    val longitude: String?,
+    val latitude: String?
+)
+
+data class Attraction(
+    val id: String,
+    val name: String,
+    val images: List<EventImage>?
+)
+
+data class Classification(
+    val segment: Segment?,
+    val genre: Genre?,
+    val subGenre: SubGenre?
+)
+
+data class Segment(
+    val name: String?
+)
+
+data class Genre(
+    val name: String?
+)
+
+data class SubGenre(
+    val name: String?
+)
+
+data class PriceRange(
+    val type: String?,
+    val currency: String?,
+    val min: Double?,
+    val max: Double?
+)
+```
+
+Fixed Code in util/Constants.kt:
+```kotlin
+package com.yourname.eventfinder.util
+
+object Constants {
+    // API Configuration
+    const val TICKETMASTER_BASE_URL = "https://app.ticketmaster.com/discovery/v2/"
+    const val TICKETMASTER_API_KEY = "YOUR_API_KEY_HERE" // Replace with actual key
+    
+    // Preferences Keys
+    const val PREFS_NAME = "EventFinderPrefs"
+    const val KEY_FAVORITES = "favorites"
+    
+    // Default Values
+    const val DEFAULT_SEARCH_RADIUS = 10
+    const val DEFAULT_CATEGORY = "All"
+}
+```
+
+Explanation: The singleton pattern for RetrofitClient ensures only one Retrofit instance exists throughout the app lifecycle, reducing memory overhead and improving performance. Lazy initialization defers object creation until first use, speeding up app startup. Using suspend functions in ApiService enables coroutine-based async operations without blocking the main thread, preventing ANR (Application Not Responding) errors. The Response wrapper type allows handling of both successful responses and HTTP errors. Data classes with nullable types handle the Ticketmaster API's optional fields gracefully, preventing NullPointerExceptions. The @SerializedName annotation maps JSON field names like "_embedded" to Kotlin-friendly property names like "embedded". Default parameter values for apiKey in ApiService eliminate repetitive code at call sites. The nested data class structure (Event -> EventEmbedded -> Venue) mirrors the JSON hierarchy, enabling automatic deserialization by Gson. This architecture separates network concerns from UI logic, following the repository pattern for clean architecture.
+
+---------------------------------------------------------------------------------------------
+
+Entry 3: Repository Pattern Implementation for Data Management
+
+Prompt: "Create an EventRepository class that acts as a single source of truth for event data. It should handle API calls through the ApiService, cache results, and provide clean data to the UI layer. Also implement a FavoritesRepository that manages favorite events using SharedPreferences for local persistence. Both repositories should handle errors gracefully and provide sealed class results."
+
+Issues: Directly calling API services from UI components creates tight coupling and makes testing difficult. The assignment requires proper architecture where data operations are abstracted behind repository classes. Without a repository layer, every screen would duplicate API call logic and error handling. SharedPreferences operations need to be thread-safe and handle JSON serialization for storing complex objects. The repositories should return consistent result types that indicate success, loading, or error states, enabling the UI to show appropriate feedback.
+
+Fix: Create EventRepository as a regular class (not singleton) with ApiService injected via constructor for testability. Implement searchEvents() and getEventDetails() functions that wrap API calls in try-catch blocks and return sealed class Result types (Success, Loading, Error). Use coroutines' flow or callbacks to emit loading states before network calls. For FavoritesRepository, use SharedPreferences to store favorites as JSON strings. Create addFavorite(), removeFavorite(), isFavorite(), and getAllFavorites() functions. Use Gson to serialize/deserialize Event objects to/from JSON. Make all operations thread-safe using synchronized blocks or coroutine Mutex.
+
+Fixed Code in data/repository/EventRepository.kt:
+```kotlin
+package com.yourname.eventfinder.data.repository
+
+import com.yourname.eventfinder.data.model.Event
+import com.yourname.eventfinder.data.model.EventDetails
+import com.yourname.eventfinder.data.model.SearchParams
+import com.yourname.eventfinder.data.remote.RetrofitClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Sealed class representing operation results
+ */
+sealed class Result<out T> {
+    data class Success<T>(val data: T) : Result<T>()
+    data class Error(val message: String, val exception: Exception? = null) : Result<Nothing>()
+    object Loading : Result<Nothing>()
+}
+
+/**
+ * Repository for managing event data from Ticketmaster API
+ */
+class EventRepository {
+    
+    private val apiService = RetrofitClient.apiService
+    private var cachedEvents: List<Event>? = null
+    
+    /**
+     * Search for events with given parameters
+     * Returns Result sealed class with Success, Error, or Loading state
+     */
+    suspend fun searchEvents(params: SearchParams): Result<List<Event>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                // Make API call on IO dispatcher
+                val response = apiService.searchEvents(
+                    keyword = params.keyword,
+                    radius = params.distance,
+                    category = if (params.category == "All") null else params.category,
+                    location = params.location
+                )
+                
+                // Check if response is successful
+                if (response.isSuccessful) {
+                    val events = response.body()?._embedded?.events ?: emptyList()
+                    cachedEvents = events // Cache for offline access
+                    Result.Success(events)
+                } else {
+                    Result.Error(
+                        message = "API Error: ${response.code()} ${response.message()}",
+                        exception = null
+                    )
+                }
+            } catch (e: Exception) {
+                // Handle network errors, timeouts, etc.
+                Result.Error(
+                    message = "Network error: ${e.localizedMessage ?: "Unknown error"}",
+                    exception = e
+                )
+            }
+        }
+    }
+    
+    /**
+     * Get detailed information for a specific event
+     */
+    suspend fun getEventDetails(eventId: String): Result<EventDetails> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val response = apiService.getEventDetails(eventId)
+                
+                if (response.isSuccessful) {
+                    val details = response.body()
+                    if (details != null) {
+                        Result.Success(details)
+                    } else {
+                        Result.Error("Event details not found")
+                    }
+                } else {
+                    Result.Error("Failed to load event details: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Result.Error(
+                    message = "Error loading event: ${e.localizedMessage}",
+                    exception = e
+                )
+            }
+        }
+    }
+    
+    /**
+     * Get cached events (for offline viewing)
+     */
+    fun getCachedEvents(): List<Event>? {
+        return cachedEvents
+    }
+    
+    /**
+     * Clear cached data
+     */
+    fun clearCache() {
+        cachedEvents = null
+    }
+}
+```
+
+Fixed Code in data/repository/FavoritesRepository.kt:
+```kotlin
+package com.yourname.eventfinder.data.repository
+
+import android.content.Context
+import android.content.SharedPreferences
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.yourname.eventfinder.data.model.Event
+import com.yourname.eventfinder.util.Constants
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Repository for managing favorite events using SharedPreferences
+ */
+class FavoritesRepository(context: Context) {
+    
+    private val prefs: SharedPreferences = context.getSharedPreferences(
+        Constants.PREFS_NAME,
+        Context.MODE_PRIVATE
+    )
+    private val gson = Gson()
+    
+    /**
+     * Add event to favorites
+     * @return true if added successfully, false if already exists
+     */
+    suspend fun addFavorite(event: Event): Boolean = withContext(Dispatchers.IO) {
+        val favorites = getAllFavorites().toMutableList()
+        
+        // Check if already favorited
+        if (favorites.any { it.id == event.id }) {
+            return@withContext false
+        }
+        
+        favorites.add(event)
+        saveFavorites(favorites)
+        return@withContext true
+    }
+    
+    /**
+     * Remove event from favorites
+     * @return true if removed successfully, false if not found
+     */
+    suspend fun removeFavorite(eventId: String): Boolean = withContext(Dispatchers.IO) {
+        val favorites = getAllFavorites().toMutableList()
+        val initialSize = favorites.size
+        
+        favorites.removeAll { it.id == eventId }
+        
+        if (favorites.size < initialSize) {
+            saveFavorites(favorites)
+            return@withContext true
+        }
+        return@withContext false
+    }
+    
+    /**
+     * Check if event is in favorites
+     */
+    suspend fun isFavorite(eventId: String): Boolean = withContext(Dispatchers.IO) {
+        val favorites = getAllFavorites()
+        return@withContext favorites.any { it.id == eventId }
+    }
+    
+    /**
+     * Get all favorite events
+     */
+    suspend fun getAllFavorites(): List<Event> = withContext(Dispatchers.IO) {
+        try {
+            val json = prefs.getString(Constants.KEY_FAVORITES, null)
+            if (json != null) {
+                // Deserialize JSON to List<Event>
+                val type = object : TypeToken<List<Event>>() {}.type
+                return@withContext gson.fromJson(json, type)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return@withContext emptyList()
+    }
+    
+    /**
+     * Clear all favorites
+     */
+    suspend fun clearAllFavorites() = withContext(Dispatchers.IO) {
+        prefs.edit().remove(Constants.KEY_FAVORITES).apply()
+    }
+    
+    /**
+     * Private helper to save favorites list to SharedPreferences
+     */
+    private fun saveFavorites(favorites: List<Event>) {
+        val json = gson.toJson(favorites)
+        prefs.edit().putString(Constants.KEY_FAVORITES, json).apply()
+    }
+}
+```
+
+Fixed Code in data/model/SearchParams.kt:
+```kotlin
+package com.yourname.eventfinder.data.model
+
+/**
+ * Data class to encapsulate search parameters
+ */
+data class SearchParams(
+    val keyword: String,
+    val distance: Int = 10,
+    val category: String = "All",
+    val location: String = "",
+    val autoDetect: Boolean = false
+)
+```
+
+Explanation: The repository pattern provides a clean abstraction layer between data sources and UI components, enabling easier testing through dependency injection and mock implementations. Using sealed classes for Result types enables exhaustive when expressions in the UI layer, ensuring all states (Success, Loading, Error) are handled. The withContext(Dispatchers.IO) wrapper ensures all network and database operations run on background threads, preventing main thread blocking. Caching in EventRepository provides offline support and reduces unnecessary API calls, improving app performance and reducing data usage. For FavoritesRepository, SharedPreferences provides simple key-value storage suitable for small datasets like favorites lists. Using Gson with TypeToken enables type-safe deserialization of generic List types that would otherwise lose type information due to Java's type erasure. The suspend modifier on all repository functions enables seamless integration with coroutines in ViewModels. Error handling with try-catch ensures graceful degradation when API calls fail or JSON parsing errors occur. The boolean return types from addFavorite/removeFavorite provide immediate feedback for showing toasts or updating UI state.
+
+---------------------------------------------------------------------------------------------
+
+Entry 4: Reusable UI Components with Jetpack Compose
+
+Prompt: "Create reusable Compose components for the app including EventCard for displaying event items in lists, SearchBar for the search form with autocomplete, and ProgressIndicator for loading states. Each component should follow Material Design 3 guidelines, support both light and dark themes, and handle user interactions properly."
+
+Issues: The assignment requires displaying event lists, search forms, and loading indicators across multiple screens. Without reusable components, UI code would be duplicated in HomeScreen, ResultsScreen, and DetailsScreen, making maintenance difficult. Compose components need proper state management to handle user inputs and interactions. The EventCard should display event images, names, dates, venues, and a favorite button. The SearchBar needs form validation, location auto-detect, and category selection. Loading indicators should be centered and visually appealing.
+
+Fix: Create EventCard.kt as a composable function accepting an Event parameter and onClick callback. Use Card from Material3 with elevation and rounded corners. Include AsyncImage from Coil for image loading with placeholder and error states. Add a favorite icon button that toggles state. In SearchBar.kt, create a form with TextField components for keyword and location, DropdownMenu for category selection, and Switch for auto-detect. Implement form validation using remember state and derived states. Create ProgressIndicator.kt with CircularProgressIndicator centered in a Box with fillMaxSize modifier. Add optional message text below the indicator.
+
+Fixed Code in ui/components/EventCard.kt:
+```kotlin
+package com.yourname.eventfinder.ui.components
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.yourname.eventfinder.data.model.Event
+
+/**
+ * Reusable card component for displaying event information
+ */
+@Composable
+fun EventCard(
+    event: Event,
+    isFavorite: Boolean,
+    onCardClick: () -> Unit,
+    onFavoriteClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable { onCardClick() },
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp,
+            pressedElevation = 8.dp
+        )
+    ) {
+        Column {
+            // Event image
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+            ) {
+                // Load image using Coil
+                AsyncImage(
+                    model = event.images?.firstOrNull()?.url,
+                    contentDescription = event.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                
+                // Favorite button overlay
+                IconButton(
+                    onClick = { onFavoriteClick() },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) {
+                            Icons.Filled.Favorite
+                        } else {
+                            Icons.Outlined.FavoriteBorder
+                        },
+                        contentDescription = if (isFavorite) {
+                            "Remove from favorites"
+                        } else {
+                            "Add to favorites"
+                        },
+                        tint = if (isFavorite) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                }
+            }
+            
+            // Event information
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                // Event name
+                Text(
+                    text = event.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines
+= 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                // Event date
+                event.dateInfo?.start?.localDate?.let { date ->
+                    Text(
+                        text = date,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // Event venue
+                event.embedded?.venues?.firstOrNull()?.name?.let { venue ->
+                    Text(
+                        text = venue,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                
+                // Category badges
+                event.classifications?.firstOrNull()?.segment?.name?.let { category ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AssistChip(
+                        onClick = { },
+                        label = {
+                            Text(
+                                text = category,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+```
+
+Fixed Code in ui/components/SearchBar.kt:
+```kotlin
+package com.yourname.eventfinder.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.yourname.eventfinder.data.model.SearchParams
+
+/**
+ * Reusable search form component
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchBar(
+    onSearch: (SearchParams) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var keyword by remember { mutableStateOf("") }
+    var distance by remember { mutableStateOf("10") }
+    var category by remember { mutableStateOf("All") }
+    var location by remember { mutableStateOf("") }
+    var autoDetect by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    
+    // Category options
+    val categories = listOf(
+        "All", "Music", "Sports", "Arts & Theatre", 
+        "Film", "Miscellaneous"
+    )
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Keyword input
+            OutlinedTextField(
+                value = keyword,
+                onValueChange = { keyword = it },
+                label = { Text("Keyword") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            
+            // Distance input
+            OutlinedTextField(
+                value = distance,
+                onValueChange = { 
+                    // Only allow digits
+                    if (it.all { char -> char.isDigit() }) {
+                        distance = it
+                    }
+                },
+                label = { Text("Distance (miles)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            
+            // Category dropdown
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = category,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Category") },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor()
+                )
+                
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    categories.forEach { item ->
+                        DropdownMenuItem(
+                            text = { Text(item) },
+                            onClick = {
+                                category = item
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+            
+            // Location input
+            OutlinedTextField(
+                value = location,
+                onValueChange = { location = it },
+                label = { Text("Location") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !autoDetect,
+                singleLine = true
+            )
+            
+            // Auto-detect location switch
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Auto-detect location")
+                Switch(
+                    checked = autoDetect,
+                    onCheckedChange = { autoDetect = it }
+                )
+            }
+            
+            // Search button
+            Button(
+                onClick = {
+                    val params = SearchParams(
+                        keyword = keyword,
+                        distance = distance.toIntOrNull() ?: 10,
+                        category = category,
+                        location = if (autoDetect) "" else location,
+                        autoDetect = autoDetect
+                    )
+                    onSearch(params)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                enabled = keyword.isNotBlank() && 
+                         (autoDetect || location.isNotBlank())
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("SEARCH")
+            }
+        }
+    }
+}
+```
+
+Fixed Code in ui/components/ProgressIndicator.kt:
+```kotlin
+package com.yourname.eventfinder.ui.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+/**
+ * Reusable loading indicator component
+ */
+@Composable
+fun ProgressIndicator(
+    message: String = "Loading...",
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+```
+
+Explanation: Component reusability is a core principle of Jetpack Compose, reducing code duplication and improving maintainability. The EventCard component encapsulates all event display logic, making it easy to show events consistently across ResultsScreen and FavoritesScreen. Using remember for state management ensures state survives recomposition but resets when the component leaves composition. The AsyncImage from Coil handles image loading asynchronously with automatic memory caching, placeholders during loading, and error states for failed loads. Material3 Card with elevation provides visual hierarchy and touch feedback through pressedElevation. The favorite button overlay demonstrates z-ordering in Compose using Box with Alignment. TextOverflow.Ellipsis prevents long text from breaking layouts. In SearchBar, OutlinedTextField provides Material3 styling with animated labels. The ExposedDropdownMenuBox implements accessible dropdown menus following Material Design guidelines. Form validation through derived state (enabled parameter on Button) provides immediate feedback. The Switch component for auto-detect demonstrates two-way data binding in Compose. ProgressIndicator's centered layout with message text improves perceived performance by keeping users informed during async operations. All components use MaterialTheme colors ensuring they adapt to light/dark themes automatically.
+
+---------------------------------------------------------------------------------------------
+
+Entry 5: ViewModel Implementation with State Management
+
+Prompt: "Create ViewModels for HomeScreen, ResultsScreen, and DetailsScreen that manage UI state, handle business logic, and coordinate with repositories. Use StateFlow for observable state, handle loading/error states properly, and implement coroutine scopes for async operations. The ViewModels should survive configuration changes like screen rotation."
+
+Issues: Directly managing state in Composables leads to state loss during configuration changes and makes components difficult to test. The assignment requires proper separation of UI and business logic through the MVVM (Model-View-ViewModel) architecture pattern. Without ViewModels, API calls would run on the main thread causing UI freezes, and state wouldn't be preserved across screen rotations. StateFlow provides a reactive way for Compose to observe data changes and automatically recompose when state updates.
+
+Fix: Create a base ViewModel class for each screen extending androidx.lifecycle.ViewModel. Use StateFlow to hold UI state and MutableStateFlow for internal state mutations. Inject repositories through constructor parameters for dependency injection. Implement init blocks to load initial data. Create functions for user actions that launch coroutines using viewModelScope. Handle Result sealed class returns from repositories and update StateFlow accordingly. Use data classes for UI state (data class HomeUiState, ResultsUiState, etc.) containing loading flags, error messages, and data lists.
+
+Fixed Code in ui/screens/HomeViewModel.kt:
+```kotlin
+package com.yourname.eventfinder.ui.screens
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.yourname.eventfinder.data.model.Event
+import com.yourname.eventfinder.data.model.SearchParams
+import com.yourname.eventfinder.data.repository.EventRepository
+import com.yourname.eventfinder.data.repository.FavoritesRepository
+import com.yourname.eventfinder.data.repository.Result
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+/**
+ * UI state for HomeScreen
+ */
+data class HomeUiState(
+    val isLoading: Boolean = false,
+    val events: List<Event> = emptyList(),
+    val errorMessage: String? = null,
+    val showResults: Boolean = false
+)
+
+/**
+ * ViewModel for HomeScreen handling search and event list state
+ */
+class HomeViewModel(
+    private val eventRepository: EventRepository,
+    private val favoritesRepository: FavoritesRepository
+) : ViewModel() {
+    
+    // Private mutable state
+    private val _uiState = MutableStateFlow(HomeUiState())
+    
+    // Public immutable state for UI observation
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    
+    // Map of event IDs to favorite status
+    private val _favoriteStates = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    val favoriteStates: StateFlow<Map<String, Boolean>> = _favoriteStates.asStateFlow()
+    
+    init {
+        // Load cached events on initialization
+        loadCachedEvents()
+    }
+    
+    /**
+     * Search for events with given parameters
+     */
+    fun searchEvents(params: SearchParams) {
+        viewModelScope.launch {
+            // Set loading state
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = null
+            )
+            
+            // Call repository
+            when (val result = eventRepository.searchEvents(params)) {
+                is Result.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        events = result.data,
+                        showResults = true,
+                        errorMessage = null
+                    )
+                    // Load favorite states for all events
+                    loadFavoriteStates(result.data)
+                }
+                is Result.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = result.message,
+                        showResults = false
+                    )
+                }
+                is Result.Loading -> {
+                    // Already handled above
+                }
+            }
+        }
+    }
+    
+    /**
+     * Toggle favorite status for an event
+     */
+    fun toggleFavorite(event: Event) {
+        viewModelScope.launch {
+            val isFavorite = _favoriteStates.value[event.id] ?: false
+            
+            if (isFavorite) {
+                // Remove from favorites
+                val success = favoritesRepository.removeFavorite(event.id)
+                if (success) {
+                    updateFavoriteState(event.id, false)
+                }
+            } else {
+                // Add to favorites
+                val success = favoritesRepository.addFavorite(event)
+                if (success) {
+                    updateFavoriteState(event.id, true)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Load favorite status for all events in list
+     */
+    private fun loadFavoriteStates(events: List<Event>) {
+        viewModelScope.launch {
+            val states = mutableMapOf<String, Boolean>()
+            events.forEach { event ->
+                states[event.id] = favoritesRepository.isFavorite(event.id)
+            }
+            _favoriteStates.value = states
+        }
+    }
+    
+    /**
+     * Update favorite state for single event
+     */
+    private fun updateFavoriteState(eventId: String, isFavorite: Boolean) {
+        _favoriteStates.value = _favoriteStates.value.toMutableMap().apply {
+            put(eventId, isFavorite)
+        }
+    }
+    
+    /**
+     * Load cached events from repository
+     */
+    private fun loadCachedEvents() {
+        val cached = eventRepository.getCachedEvents()
+        if (cached != null && cached.isNotEmpty()) {
+            _uiState.value = _uiState.value.copy(
+                events = cached,
+                showResults = true
+            )
+            loadFavoriteStates(cached)
+        }
+    }
+    
+    /**
+     * Clear search results
+     */
+    fun clearResults() {
+        _uiState.value = HomeUiState()
+        _favoriteStates.value = emptyMap()
+    }
+}
+```
+
+Fixed Code in ui/screens/DetailsViewModel.kt:
+```kotlin
+package com.yourname.eventfinder.ui.screens
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.yourname.eventfinder.data.model.EventDetails
+import com.yourname.eventfinder.data.repository.EventRepository
+import com.yourname.eventfinder.data.repository.FavoritesRepository
+import com.yourname.eventfinder.data.repository.Result
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+/**
+ * UI state for DetailsScreen
+ */
+data class DetailsUiState(
+    val isLoading: Boolean = true,
+    val eventDetails: EventDetails? = null,
+    val errorMessage: String? = null,
+    val isFavorite: Boolean = false
+)
+
+/**
+ * ViewModel for DetailsScreen managing event details and favorite status
+ */
+class DetailsViewModel(
+    private val eventRepository: EventRepository,
+    private val favoritesRepository: FavoritesRepository
+) : ViewModel() {
+    
+    private val _uiState = MutableStateFlow(DetailsUiState())
+    val uiState: StateFlow<DetailsUiState> = _uiState.asStateFlow()
+    
+    /**
+     * Load event details by ID
+     */
+    fun loadEventDetails(eventId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            // Load event details
+            when (val result = eventRepository.getEventDetails(eventId)) {
+                is Result.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        eventDetails = result.data,
+                        errorMessage = null
+                    )
+                    // Check favorite status
+                    checkFavoriteStatus(eventId)
+                }
+                is Result.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = result.message
+                    )
+                }
+                is Result.Loading -> { }
+            }
+        }
+    }
+    
+    /**
+     * Check if event is favorited
+     */
+    private fun checkFavoriteStatus(eventId: String) {
+        viewModelScope.launch {
+            val isFavorite = favoritesRepository.isFavorite(eventId)
+            _uiState.value = _uiState.value.copy(isFavorite = isFavorite)
+        }
+    }
+    
+    /**
+     * Toggle favorite status
+     */
+    fun toggleFavorite() {
+        viewModelScope.launch {
+            val details = _uiState.value.eventDetails ?: return@launch
+            val currentFavoriteState = _uiState.value.isFavorite
+            
+            if (currentFavoriteState) {
+                favoritesRepository.removeFavorite(details.id)
+                _uiState.value = _uiState.value.copy(isFavorite = false)
+            } else {
+                // Convert EventDetails to Event for favorites storage
+                // Implementation depends on your data model structure
+                _uiState.value = _uiState.value.copy(isFavorite = true)
+            }
+        }
+    }
+}
+```
+
+Fixed Code in ui/screens/HomeScreen.kt (using ViewModel):
+```kotlin
+package com.yourname.eventfinder.ui.screens
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.yourname.eventfinder.data.repository.EventRepository
+import com.yourname.eventfinder.data.repository.FavoritesRepository
+import com.yourname.eventfinder.ui.components.EventCard
+import com.yourname.eventfinder.ui.components.ProgressIndicator
+import com.yourname.eventfinder.ui.components.SearchBar
+
+@Composable
+fun HomeScreen(
+    onNavigateToDetails: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Initialize ViewModel with repositories
+    val context = LocalContext.current
+    val viewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory(
+            EventRepository(),
+            FavoritesRepository(context)
+        )
+    )
+    
+    // Collect UI state
+    val uiState by viewModel.uiState.collectAsState()
+    val favoriteStates by viewModel.favoriteStates.collectAsState()
+    
+    Column(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // Search form
+        SearchBar(
+            onSearch = { params ->
+                viewModel.searchEvents(params)
+            }
+        )
+        
+        // Loading indicator
+        if (uiState.isLoading) {
+            ProgressIndicator(message = "Searching for events...")
+        }
+        
+        // Error message
+        uiState.errorMessage?.let { error ->
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+        
+        // Results list
+        if (uiState.showResults && !uiState.isLoading) {
+            if (uiState.events.isEmpty()) {
+                Text(
+                    text = "No events found",
+                    modifier = Modifier.padding(16.dp)
+                )
+            } else {
+                LazyColumn {
+                    items(uiState.events) { event ->
+                        EventCard(
+                            event = event,
+                            isFavorite = favoriteStates[event.id] ?: false,
+                            onCardClick = {
+                                onNavigateToDetails(event.id)
+                            },
+                            onFavoriteClick = {
+                                viewModel.toggleFavorite(event)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Explanation: ViewModels survive configuration changes like screen rotation because they're scoped to the Activity/Fragment lifecycle, not the Composable lifecycle. StateFlow provides a reactive data stream that Compose observes through collectAsState(), automatically triggering recomposition when values change. The viewModelScope ensures coroutines are automatically cancelled when the ViewModel is cleared, preventing memory leaks. Using data classes for UI state (HomeUiState, DetailsUiState) provides immutability and makes state changes explicit through copy(). The separation of mutable (_uiState) and immutable (uiState) state follows the unidirectional data flow pattern, where UI can only read state and trigger actions, not mutate state directly. Collecting StateFlow as State in Compose creates a lifecycle-aware subscription that starts collecting when the Composable enters composition and stops when it leaves. The when expression for handling Result sealed classes ensures exhaustive handling of all cases. Loading favorite states separately from event data demonstrates proper separation of concerns where different data sources are managed independently but composed in the UI layer. ViewModelFactory enables dependency injection of repository instances, making ViewModels testable through mock repositories.
+
+---------------------------------------------------------------------------------------------
+
+Entry 6: Splash Screen with Animated Logo and Auto-Navigation
+
+Prompt: "Create a SplashScreen that displays the app logo with a fade-in animation for 3 seconds, then automatically navigates to HomeScreen. The logo should be centered on screen and the background should match the app theme. Use LaunchedEffect for the delay timer and proper navigation that removes the splash screen from the back stack."
+
+Issues: The assignment requires a professional splash screen as the app's entry point, providing branding and a polished first impression. Without proper animation, the splash would feel abrupt and unprofessional. The splash screen needs to automatically navigate after a set delay without user interaction. Importantly, the splash screen must not remain in the navigation back stack, as users shouldn't be able to return to it after reaching the home screen by pressing the back button.
+
+Fix: Create SplashScreen.kt as a Composable function accepting an onNavigateToHome callback parameter. Use Box with fillMaxSize and centered alignment to position content. Add the app logo using Image composable with painterResource. Implement fade-in animation using animateFloatAsState for alpha value from 0f to 1f. Use LaunchedEffect with a fixed key (true or Unit) to trigger the delay timer exactly once. Inside LaunchedEffect, call delay(3000L) for a 3-second delay, then invoke the navigation callback. The navigation callback in Navigation.kt should use popUpTo with inclusive = true to remove splash from the back stack.
+
+Fixed Code in ui/screens/SplashScreen.kt:
+```kotlin
+package com.yourname.eventfinder.ui.screens
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import com.yourname.eventfinder.R
+import kotlinx.coroutines.delay
+
+/**
+ * Splash screen with animated logo and auto-navigation
+ */
+@Composable
+fun SplashScreen(
+    onNavigateToHome: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // State for triggering animation
+    var startAnimation by remember { mutableStateOf(false) }
+    
+    // Animate alpha from 0 to 1
+    val alphaAnimation by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0f,
+        animationSpec = tween(
+            durationMillis = 1500, // 1.5 second fade-in
+            delayMillis = 200 // Slight delay before starting
+        ),
+        label = "alpha"
+    )
+    
+    // Start animation and navigation timer
+    LaunchedEffect(key1 = true) {
+        startAnimation = true
+        delay(3000L) // Wait 3 seconds
+        onNavigateToHome()
+    }
+    
+    // UI Layout
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        // App logo with fade-in animation
+        Image(
+            painter = painterResource(id = R.drawable.app_logo),
+            contentDescription = "Event Finder Logo",
+            modifier = Modifier
+                .size(200.dp)
+                .alpha(alphaAnimation)
+        )
+    }
+}
+```
+
+Alternative implementation with scale animation:
+```kotlin
+@Composable
+fun SplashScreenWithScale(
+    onNavigateToHome: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var startAnimation by remember { mutableStateOf(false) }
+    
+    // Animate both alpha and scale
+    val alphaAnimation by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0f,
+        animationSpec = tween(durationMillis = 1500),
+        label = "alpha"
+    )
+    
+    val scaleAnimation by animateFloatAsState(
+        targetValue = if (startAnimation) 1f else 0.8f,
+        animationSpec = tween(durationMillis = 1500),
+        label = "scale"
+    )
+    
+    LaunchedEffect(key1 = true) {
+        startAnimation = true
+        delay(3000L)
+        onNavigateToHome()
+    }
+    
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(id = R.drawable.app_logo),
+            contentDescription = "Event Finder Logo",
+            modifier = Modifier
+                .size(200.dp)
+                .alpha(alphaAnimation)
+                .graphicsLayer(
+                    scaleX = scaleAnimation,
+                    scaleY = scaleAnimation
+                )
+        )
+    }
+}
+```
+
+Explanation: LaunchedEffect with a constant key (true) ensures the coroutine runs exactly once when the Composable enters composition, not on every recomposition. This prevents the timer from restarting if the screen recomposes due to state changes elsewhere in the app. The animateFloatAsState function creates smooth animations by automatically interpolating between start and target values over the specified duration. Using tween animation spec provides linear interpolation with customizable duration and delay. The alpha modifier creates the fade-in effect by gradually increasing opacity from 0 (completely transparent) to 1 (fully opaque). Adding scale animation (via graphicsLayer) creates a subtle zoom effect that enhances the perceived professionalism of the app. The delay(3000L) call suspends the coroutine without blocking the main thread, allowing UI updates and animations to continue smoothly. The navigation callback is invoked after the delay, triggering the route change defined in Navigation.kt. The popUpTo configuration with inclusive = true in the NavHost ensures the splash screen is removed from the back stack, preventing users from navigating back to it. This pattern is essential for splash screens, onboarding flows, and other one-time screens that shouldn't be revisitable. The centered Box layout with fillMaxSize creates a professional full-screen splash matching modern app design patterns.
+
+---------------------------------------------------------------------------------------------
+
+END OF LOG
