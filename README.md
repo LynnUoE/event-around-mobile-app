@@ -22,14 +22,16 @@ An Android app for discovering events near you, powered by the Ticketmaster Disc
 | **Language** | Kotlin |
 | **UI Framework** | Jetpack Compose + Material Design 3 |
 | **Navigation** | Navigation Compose |
-| **Networking** | Retrofit + Gson Converter + OkHttp |
+| **Networking** | Retrofit 2.9 + Gson Converter + OkHttp 4.x |
 | **Async** | Kotlin Coroutines |
-| **Image Loading** | Coil |
+| **Serialization** | Gson + Kotlinx Serialization |
+| **Image Loading** | Coil Compose |
 | **Architecture** | MVVM (ViewModel + StateFlow) |
-| **Local Storage** | SharedPreferences |
-| **APIs** | Ticketmaster Discovery API, Spotify Web API, Google Places & Geocoding APIs |
+| **Local Storage** | DataStore Preferences (favorites) + SharedPreferences (search params & history) |
+| **Maps** | Google Maps Compose + Play Services Maps & Location |
+| **APIs** | Ticketmaster Discovery API, Spotify Web API, Google Places Autocomplete & Geocoding APIs, IPInfo.io (IP geolocation) |
 | **Min SDK** | 24 (Android 7.0) |
-| **Target SDK** | 34 (Android 14) |
+| **Compile / Target SDK** | 35 (Android 15) |
 
 ## 🏗 Project Structure
 
